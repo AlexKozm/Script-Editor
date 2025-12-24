@@ -1,6 +1,15 @@
 package com.example.scripteditor.ui
 
+import androidx.compose.foundation.text.input.InputTransformation
+import androidx.compose.foundation.text.input.OutputTransformation
 import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.input.OffsetMapping
+import androidx.compose.ui.text.input.TransformedText
+import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.withStyle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.scripteditor.core.ExecutionState
@@ -29,6 +38,23 @@ class MainScreenVM : ViewModel() {
     }
     val executionState: StateFlow<ExecutionState> get() = scriptController.executionState
 
+    val keyWords = setOf("fun", "val", "var", "when", "while", "for", "class", "interface", "object", "this")
+    val regex = Regex(keyWords.joinToString("\\b|") + "\\b")
+    val codeEditorOutputTransformation = OutputTransformation {
+        regex
+            .findAll(asCharSequence())
+            .map { it.range }
+            .forEach { range ->
+                addStyle(spanStyle = SpanStyle(color = Color.Blue), start = range.first, end = range.last + 1)
+            }
+    }
+
+    val codeEditorInputTransformation = InputTransformation {
+        if (asCharSequence().contains("\t")) {
+            val newText = asCharSequence().toString().replace("\t", "    ")
+            replace(0, length, newText)
+        }
+    }
 
     val command: TextFieldState = TextFieldState("kotlinc -script")
     val file: TextFieldState = TextFieldState("foo.kts")
