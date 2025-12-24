@@ -14,6 +14,7 @@ import androidx.compose.foundation.text.input.InputTransformation
 import androidx.compose.foundation.text.input.OutputTransformation
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.material3.Card
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -36,7 +37,7 @@ fun ScriptEditor(
             modifier = Modifier.fillMaxSize()
                 .padding(8.dp)
         ) {
-            BasicTextField(
+            OutlinedTextField(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(end = 16.dp),
