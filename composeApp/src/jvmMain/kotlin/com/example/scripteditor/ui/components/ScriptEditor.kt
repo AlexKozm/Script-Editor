@@ -85,6 +85,7 @@ private val codeEditorOutputTransformation = OutputTransformation {
         }
 }
 
+// TODO: works laggy. Delete or fix
 private val codeEditorInputTransformation = InputTransformation {
     if (asCharSequence().contains("\t")) {
         val newText = asCharSequence().toString().replace("\t", "    ")

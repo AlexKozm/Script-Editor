@@ -26,16 +26,7 @@ import kotlinx.coroutines.flow.map
 class MainScreenVM : ViewModel() {
     val scriptController: ScriptController = ScriptControllerImpl(viewModelScope)
     val codeEditorState: TextFieldState = TextFieldState()
-    val scriptOutput: Flow<String> get() = scriptController.scriptOutput.map {
-        it.joinToString("\n") { event ->
-            when (event) {
-                is ExecutionEvent.Finished -> "FINISHED. Code: ${event.exitCode}"
-                is ExecutionEvent.StdErr -> event.line
-                is ExecutionEvent.StdOut -> event.line
-                is ExecutionEvent.SystemError -> "ERR: ${event.message}"
-            }
-        }
-    }
+    val scriptOutput: Flow<List<ExecutionEvent>> get() = scriptController.scriptOutput
     val executionState: StateFlow<ExecutionState> get() = scriptController.executionState
 
     val keyWords = setOf("fun", "val", "var", "when", "while", "for", "class", "interface", "object", "this")

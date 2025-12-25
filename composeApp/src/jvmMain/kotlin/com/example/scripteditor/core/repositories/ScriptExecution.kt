@@ -2,10 +2,16 @@ package com.example.scripteditor.core.repositories
 
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.ProducerScope
 import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.flow.buffer
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.withIndex
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.yield
 import java.io.IOException
@@ -20,7 +26,7 @@ class ScriptExecution(
         val process: Process = try {
             ProcessBuilder(command, *arguments.toTypedArray()).redirectErrorStream(false).start()
         } catch (e: IOException) {
-            trySend(ExecutionEvent.SystemError("Failed to start process: ${e.localizedMessage}"))
+            send(ExecutionEvent.SystemError("Failed to start process: ${e.localizedMessage}"))
             close()
             return@callbackFlow
         }
@@ -33,7 +39,7 @@ class ScriptExecution(
                 val exitCode = process.waitFor()
                 outJob.join()
                 errJob.join()
-                trySend(ExecutionEvent.Finished(exitCode))
+                send(ExecutionEvent.Finished(exitCode))
             } finally {
                 close()
             }
@@ -45,13 +51,20 @@ class ScriptExecution(
             outJob.cancel()
             errJob.cancel()
         }
-    }.flowOn(coroutineDispatcher)
+    }.buffer(capacity = 10000, onBufferOverflow = BufferOverflow.DROP_OLDEST)
+        .flowOn(coroutineDispatcher)
+        .withIndex()
+        .map { (index, output) ->
+            output.index = index
+            output
+        }
+        .onEach { println("ScriptExecution: $it") }
 
     private suspend fun ProducerScope<ExecutionEvent>.processStdErr(process: Process) {
         try {
             readAndSend(process.errorStream) { ExecutionEvent.StdErr(it) }
         } catch (e: IOException) {
-            trySend(ExecutionEvent.SystemError("Error stream failure: ${e.localizedMessage}"))
+            send(ExecutionEvent.SystemError("Error stream failure: ${e.localizedMessage}"))
         }
     }
 
@@ -59,7 +72,7 @@ class ScriptExecution(
         try {
             readAndSend(process.inputStream) { ExecutionEvent.StdOut(it) }
         } catch (e: IOException) {
-            trySend(ExecutionEvent.SystemError("Read error: ${e.localizedMessage}"))
+            send(ExecutionEvent.SystemError("Read error: ${e.localizedMessage}"))
         }
     }
 
@@ -70,7 +83,7 @@ class ScriptExecution(
         stream.bufferedReader().use { reader ->
             reader.lineSequence().forEach { str ->
                 yield()
-                trySend(block(str))
+                send(block(str))
             }
         }
     }

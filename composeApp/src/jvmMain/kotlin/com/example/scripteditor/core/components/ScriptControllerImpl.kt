@@ -6,12 +6,17 @@ import com.example.scripteditor.core.repositories.ScriptExecution
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.conflate
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.runningFold
+import kotlinx.coroutines.flow.sample
+import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.io.File
@@ -31,6 +36,7 @@ class ScriptControllerImpl(
         file.setExecutable(true)
     }
 
+    @OptIn(FlowPreview::class)
     override fun saveAndRun(path: String, script: String, scriptExecution: ScriptExecution) {
         stop()
         saveScript(path = path, script = script)
@@ -38,7 +44,19 @@ class ScriptControllerImpl(
             _executionState.value = ExecutionState.RUNNING
             scriptExecution
                 .run()
-                .collect { event -> _scriptOutput.update { it + event } }
+                .scan(mutableListOf<ExecutionEvent>()) { acc, value ->
+                    acc.add(value)
+                    if (acc.size > 1000) acc.removeFirst()
+                    acc
+                }
+//                .sample(100)
+                .conflate()
+                .flowOn(Dispatchers.Default)
+                .collect { event ->
+//                    println("Event: ${event.lastOrNull()}")
+                    val newList = _scriptOutput.value + event
+                    _scriptOutput.value = newList.takeLast(1000)
+                }
         }
         executionJob?.invokeOnCompletion { _executionState.value = ExecutionState.STOPPED }
     }
