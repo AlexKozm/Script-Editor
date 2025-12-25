@@ -3,6 +3,7 @@ package com.example.scripteditor.ui
 import androidx.compose.foundation.text.input.InputTransformation
 import androidx.compose.foundation.text.input.OutputTransformation
 import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -21,32 +22,29 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
+import kotlin.coroutines.coroutineContext
 
 
 class MainScreenVM : ViewModel() {
-    val scriptController: ScriptController = ScriptControllerImpl(viewModelScope)
+    val scriptController: ScriptControllerImpl = ScriptControllerImpl(viewModelScope)
     val codeEditorState: TextFieldState = TextFieldState()
     val scriptOutput: Flow<List<ExecutionEvent>> get() = scriptController.scriptOutput
-    val executionState: StateFlow<ExecutionState> get() = scriptController.executionState
 
-    val keyWords = setOf("fun", "val", "var", "when", "while", "for", "class", "interface", "object", "this")
-    val regex = Regex(keyWords.joinToString("\\b|") + "\\b")
-    val codeEditorOutputTransformation = OutputTransformation {
-        regex
-            .findAll(asCharSequence())
-            .map { it.range }
-            .forEach { range ->
-                addStyle(spanStyle = SpanStyle(color = Color.Blue), start = range.first, end = range.last + 1)
+    val a = mutableStateListOf<ExecutionEvent>()
+
+    init {
+        viewModelScope.launch {
+            scriptController.sharedFlow.collect { event ->
+                event?.let {
+                    a.add(event)
+                    if (a.size > 1000) a.removeFirst()
+                }
             }
-    }
-
-    val codeEditorInputTransformation = InputTransformation {
-        if (asCharSequence().contains("\t")) {
-            val newText = asCharSequence().toString().replace("\t", "    ")
-            replace(0, length, newText)
         }
     }
 
+    val executionState: StateFlow<ExecutionState> get() = scriptController.executionState
     val command: TextFieldState = TextFieldState("kotlinc -script")
     val file: TextFieldState = TextFieldState("foo.kts")
 

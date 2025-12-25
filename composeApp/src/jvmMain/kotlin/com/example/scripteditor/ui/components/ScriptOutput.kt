@@ -18,6 +18,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -30,6 +31,7 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
 fun ScriptOutput(
     modifier: Modifier = Modifier,
     text: List<ExecutionEvent>,
+    o: SnapshotStateList<ExecutionEvent>,
 ) {
     Card (
         modifier = modifier.fillMaxSize()
@@ -44,7 +46,7 @@ fun ScriptOutput(
                     state = scrollState,
                 ) {
                     items(
-                        items = text,
+                        items = o,
                         key = { it.index },
                     ) {
                         Text(

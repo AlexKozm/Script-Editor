@@ -28,6 +28,7 @@ fun MainScreen(
 
     val output by vm.scriptOutput.collectAsStateWithLifecycle(emptyList())
     val executionState by vm.executionState.collectAsStateWithLifecycle()
+    val o = vm.a
 
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -72,7 +73,8 @@ fun MainScreen(
             Spacer(Modifier.width(4.dp))
             ScriptOutput(
                 modifier = Modifier.weight(1f),
-                text = output
+                text = output,
+                o = o
             )
 
         }

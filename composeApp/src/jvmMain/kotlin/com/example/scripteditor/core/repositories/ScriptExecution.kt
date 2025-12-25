@@ -51,13 +51,7 @@ class ScriptExecution(
             outJob.cancel()
             errJob.cancel()
         }
-    }.buffer(capacity = 10000, onBufferOverflow = BufferOverflow.DROP_OLDEST)
-        .flowOn(coroutineDispatcher)
-        .withIndex()
-        .map { (index, output) ->
-            output.index = index
-            output
-        }
+    }.flowOn(coroutineDispatcher)
         .onEach { println("ScriptExecution: $it") }
 
     private suspend fun ProducerScope<ExecutionEvent>.processStdErr(process: Process) {
@@ -82,7 +76,6 @@ class ScriptExecution(
     ) {
         stream.bufferedReader().use { reader ->
             reader.lineSequence().forEach { str ->
-                yield()
                 send(block(str))
             }
         }
