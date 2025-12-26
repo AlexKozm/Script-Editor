@@ -12,9 +12,3 @@ sealed class ExecutionEvent {
     data class SystemError(val message: String) : ExecutionEvent()
 }
 
-fun ExecutionEvent.getLine() = when (this) {
-    is Finished -> "FINISHED. Code: $exitCode"
-    is StdErr -> line
-    is StdOut -> line
-    is SystemError -> "ERR: $message"
-}

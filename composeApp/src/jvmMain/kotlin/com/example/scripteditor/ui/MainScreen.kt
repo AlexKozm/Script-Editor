@@ -16,8 +16,11 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -80,14 +83,17 @@ fun MainScreen(
         Row(
             modifier = Modifier.fillMaxSize()
         ) {
+            val focusRequester = remember { FocusRequester() }
             ScriptEditor(
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.weight(1f).focusRequester(focusRequester),
                 textFieldState = vm.codeEditorState,
             )
             Spacer(Modifier.width(4.dp))
             ScriptOutput(
                 modifier = Modifier.weight(1f),
-                state = output
+                state = output,
+                textFieldState = vm.codeEditorState,
+                focusRequester = focusRequester
             )
 
         }
