@@ -1,6 +1,7 @@
 package com.example.scripteditor.ui
 
 import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
 import androidx.compose.runtime.mutableStateListOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -37,7 +38,10 @@ class MainScreenVM : ViewModel() {
     val command: TextFieldState = TextFieldState("kotlinc -script")
     val file: TextFieldState = TextFieldState("foo.kts")
 
-
+    fun loadScript() {
+        val text = scriptController.loadScript(path = file.text.toString())
+        codeEditorState.setTextAndPlaceCursorAtEnd(text)
+    }
     fun nextExecutionState() {
         when (scriptController.executionState.value) {
             ExecutionState.STOPPED -> executeScript()
@@ -54,6 +58,13 @@ class MainScreenVM : ViewModel() {
                 command = "kotlinc",
                 arguments = listOf("-script", file.text.toString())
             )
+        )
+    }
+
+    fun saveScript() {
+        scriptController.saveScript(
+            path = file.text.toString(),
+            script = codeEditorState.text.toString()
         )
     }
 }

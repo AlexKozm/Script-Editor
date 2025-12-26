@@ -7,14 +7,21 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Download
+import androidx.compose.material.icons.outlined.Save
 import androidx.compose.material3.Button
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.scripteditor.ui.components.RunAndStopButton
 import com.example.scripteditor.ui.components.ScriptEditor
 import com.example.scripteditor.ui.components.ScriptOutput
 import com.example.scripteditor.ui.components.SmallTextField
@@ -32,31 +39,40 @@ fun MainScreen(
         modifier = Modifier.fillMaxWidth(),
     ) {
         Row {
-            Button(
-                modifier = Modifier.alignByBaseline(),
-                onClick = { vm.nextExecutionState() }
-            ) {
-                Text(
-                    text = executionState.toString()
-                )
+            IconButton(
+                modifier = Modifier.align(Alignment.CenterVertically),
+                onClick = { vm.loadScript() }
+            ){
+                Icon(Icons.Outlined.Download, contentDescription = "Open file")
             }
+            IconButton(
+                modifier = Modifier.align(Alignment.CenterVertically),
+                onClick = { vm.saveScript() }
+            ){
+                Icon(Icons.Outlined.Save, contentDescription = "Save")
+            }
+            RunAndStopButton(
+                modifier = Modifier.align(Alignment.CenterVertically),
+                onClick = vm::nextExecutionState,
+                state = executionState
+            )
             Spacer(modifier = Modifier.width(10.dp))
             Text(
-                modifier = Modifier.alignByBaseline(),
+                modifier = Modifier.align(Alignment.CenterVertically),
                 text = "Command: "
             )
             SmallTextField(
-                modifier = Modifier.alignByBaseline()
+                modifier = Modifier.align(Alignment.CenterVertically)
                     .widthIn(50.dp, 300.dp),
                 state = vm.command
             )
             Spacer(modifier = Modifier.width(10.dp))
             Text(
-                modifier = Modifier.alignByBaseline(),
+                modifier = Modifier.align(Alignment.CenterVertically),
                 text = "path: "
             )
             SmallTextField(
-                modifier = Modifier.alignByBaseline()
+                modifier = Modifier.align(Alignment.CenterVertically)
                     .widthIn(50.dp, 300.dp),
                 state = vm.file
             )

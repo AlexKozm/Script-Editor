@@ -43,6 +43,9 @@ class ScriptControllerImpl(
         file.setExecutable(true)
     }
 
+    fun loadScript(path: String): String = File(path).readText() // TODO: handle exceptions
+
+
     override fun saveAndRun(path: String, script: String, scriptExecution: ScriptExecution) {
         stop()
         saveScript(path = path, script = script)
