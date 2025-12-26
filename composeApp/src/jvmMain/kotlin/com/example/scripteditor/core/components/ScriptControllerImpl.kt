@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.conflate
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.runningFold
@@ -23,6 +24,7 @@ import kotlinx.coroutines.flow.sample
 import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.withIndex
 import kotlinx.coroutines.launch
 import java.io.File
 
@@ -30,17 +32,8 @@ class ScriptControllerImpl(
     private val coroutineScope: CoroutineScope,
 ) : ScriptController {
     private var executionJob: Job? = null
-    private val _scriptOutput: MutableStateFlow<List<ExecutionEvent>> = MutableStateFlow(emptyList())
-    override val scriptOutput: StateFlow<List<ExecutionEvent>> get() = _scriptOutput.asStateFlow()
-
-    private val _sharedFlow: MutableSharedFlow<ExecutionEvent> = MutableSharedFlow(
-        extraBufferCapacity = 1000,
-        onBufferOverflow = BufferOverflow.DROP_OLDEST
-    )
-    val sharedFlow = _sharedFlow.runningFold<ExecutionEvent, ExecutionEvent?>(null) { p, n ->
-        n.index = if (p == null) 0 else p.index + 1
-        n
-    }
+    private val _scriptOutput: MutableSharedFlow<ExecutionEvent> = MutableSharedFlow()
+    override val scriptOutput = _scriptOutput.withIndex()
 
     private val _executionState: MutableStateFlow<ExecutionState> = MutableStateFlow(ExecutionState.STOPPED)
     override val executionState: StateFlow<ExecutionState> get() = _executionState.asStateFlow()
@@ -50,30 +43,12 @@ class ScriptControllerImpl(
         file.setExecutable(true)
     }
 
-    @OptIn(FlowPreview::class)
     override fun saveAndRun(path: String, script: String, scriptExecution: ScriptExecution) {
         stop()
         saveScript(path = path, script = script)
-        executionJob = coroutineScope.launch {
+        executionJob = coroutineScope.launch(Dispatchers.Default) {
             _executionState.value = ExecutionState.RUNNING
-            scriptExecution
-                .run()
-                .collect {
-                    _sharedFlow.emit(it)
-                }
-//                .scan(mutableListOf<ExecutionEvent>()) { acc, value ->
-//                    acc.add(value)
-//                    if (acc.size > 1000) acc.removeFirst()
-//                    acc
-//                }
-////                .sample(100)
-//                .conflate()
-//                .flowOn(Dispatchers.Default)
-//                .collect { event ->
-////                    println("Event: ${event.lastOrNull()}")
-//                    val newList = _scriptOutput.value + event
-//                    _scriptOutput.value = newList.takeLast(1000)
-//                }
+            scriptExecution.run().collect(_scriptOutput::emit)
         }
         executionJob?.invokeOnCompletion { _executionState.value = ExecutionState.STOPPED }
     }
@@ -82,9 +57,5 @@ class ScriptControllerImpl(
         _executionState.value = ExecutionState.STOPPING
         executionJob?.cancel()
         executionJob = null
-    }
-
-    override fun clearOutput() {
-        _scriptOutput.value = emptyList()
     }
 }

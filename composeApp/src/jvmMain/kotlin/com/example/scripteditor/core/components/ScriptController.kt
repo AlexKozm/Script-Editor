@@ -7,10 +7,9 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 
 interface ScriptController {
-    val scriptOutput: StateFlow<List<ExecutionEvent>>
+    val scriptOutput: Flow<IndexedValue<ExecutionEvent>>
     val executionState: StateFlow<ExecutionState>
     fun saveScript(path: String, script: String)
     fun saveAndRun(path: String, script: String, scriptExecution: ScriptExecution)
     fun stop()
-    fun clearOutput()
 }

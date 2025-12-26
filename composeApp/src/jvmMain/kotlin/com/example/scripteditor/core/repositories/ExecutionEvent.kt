@@ -5,7 +5,7 @@ import com.example.scripteditor.core.repositories.ExecutionEvent.StdErr
 import com.example.scripteditor.core.repositories.ExecutionEvent.StdOut
 import com.example.scripteditor.core.repositories.ExecutionEvent.SystemError
 
-sealed class ExecutionEvent(var index: Int = 0) {
+sealed class ExecutionEvent {
     data class StdOut(val line: String) : ExecutionEvent()
     data class StdErr(val line: String) : ExecutionEvent()
     data class Finished(val exitCode: Int) : ExecutionEvent()

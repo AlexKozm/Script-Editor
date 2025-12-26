@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -26,9 +25,8 @@ fun MainScreen(
     vm: MainScreenVM = viewModel(),
 ) {
 
-    val output by vm.scriptOutput.collectAsStateWithLifecycle(emptyList())
     val executionState by vm.executionState.collectAsStateWithLifecycle()
-    val o = vm.a
+    val output = vm.mutableStateListOutput
 
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -73,8 +71,7 @@ fun MainScreen(
             Spacer(Modifier.width(4.dp))
             ScriptOutput(
                 modifier = Modifier.weight(1f),
-                text = output,
-                o = o
+                state = output
             )
 
         }

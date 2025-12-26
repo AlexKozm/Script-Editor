@@ -30,8 +30,7 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
 @Composable
 fun ScriptOutput(
     modifier: Modifier = Modifier,
-    text: List<ExecutionEvent>,
-    o: SnapshotStateList<ExecutionEvent>,
+    state: SnapshotStateList<IndexedValue<ExecutionEvent>>,
 ) {
     Card (
         modifier = modifier.fillMaxSize()
@@ -46,24 +45,17 @@ fun ScriptOutput(
                     state = scrollState,
                 ) {
                     items(
-                        items = o,
+                        items = state,
                         key = { it.index },
                     ) {
                         Text(
                             modifier = Modifier
                                 .fillMaxSize()
                                 .padding(end = 16.dp),
-                            text = it.getLine(),
+                            text = it.value.getLine(),
                         )
                     }
                 }
-//                Text(
-//                    modifier = Modifier
-//                        .fillMaxSize()
-//                        .padding(end = 16.dp)
-//                        .verticalScroll(scrollState),
-//                    text = text,
-//                )
             }
             Box(
                 modifier = Modifier
