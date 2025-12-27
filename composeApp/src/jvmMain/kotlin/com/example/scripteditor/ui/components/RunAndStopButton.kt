@@ -1,7 +1,6 @@
 package com.example.scripteditor.ui.components
 
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.RunCircle
 import androidx.compose.material.icons.outlined.Pending
 import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.Stop
@@ -18,18 +17,18 @@ fun RunAndStopButton(
     onClick: () -> Unit,
     state: ExecutionState,
 ) {
-    val icon = when (state) {
-        ExecutionState.STOPPED -> Icons.Outlined.PlayArrow
-        ExecutionState.RUNNING -> Icons.Outlined.Stop
-        ExecutionState.STOPPING -> Icons.Outlined.Pending
+    val (icon, description) = when (state) {
+        ExecutionState.STOPPED -> Icons.Outlined.PlayArrow to "Run script"
+        ExecutionState.RUNNING -> Icons.Outlined.Stop to "Stop script"
+        ExecutionState.STOPPING -> Icons.Outlined.Pending to "Script is stopping"
     }
-    val enabled = state != ExecutionState.STOPPING
+
     IconButton(
         modifier = modifier,
-        enabled = enabled,
+        enabled = state != ExecutionState.STOPPING,
         onClick = onClick
     ) {
-        Icon(icon, contentDescription = "next script execution state")
+        Icon(icon, contentDescription = description)
     }
 }
 

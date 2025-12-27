@@ -1,28 +1,27 @@
-package com.example.scripteditor.core.repositories
+package com.example.scripteditor.data
 
+import com.example.scripteditor.core.ExecutionEvent
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.ProducerScope
 import kotlinx.coroutines.channels.awaitClose
-import kotlinx.coroutines.flow.buffer
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.flowOn
-import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
-import kotlinx.coroutines.flow.withIndex
+import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.yield
 import java.io.IOException
 import java.io.InputStream
 
-class ScriptExecution(
-    val command: String,
-    val arguments: List<String>,
-    val coroutineDispatcher: CoroutineDispatcher = Dispatchers.IO,
-) {
-    fun run() = callbackFlow {
+class ScriptExecutionRepositoryImpl(
+    val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+): ScriptExecutionRepository {
+    override fun run(
+        command: String,
+        arguments: List<String>,
+    ) = callbackFlow {
         val process: Process = try {
             ProcessBuilder(command, *arguments.toTypedArray()).redirectErrorStream(false).start()
         } catch (e: IOException) {
@@ -31,14 +30,13 @@ class ScriptExecution(
             return@callbackFlow
         }
 
-        val outJob = launch(coroutineDispatcher) { processStdOut(process) }
-        val errJob = launch(coroutineDispatcher) { processStdErr(process) }
+        val outJob = launch { processStdOut(process) }
+        val errJob = launch { processStdErr(process) }
 
-        val exitCodeJob = launch(coroutineDispatcher) {
+        val exitCodeJob = launch {
             try {
                 val exitCode = process.waitFor()
-                outJob.join()
-                errJob.join()
+                listOf(outJob, errJob).joinAll()
                 send(ExecutionEvent.Finished(exitCode))
             } finally {
                 close()
@@ -47,12 +45,10 @@ class ScriptExecution(
 
         awaitClose {
             if (process.isAlive) process.destroy()
-            exitCodeJob.cancel()
-            outJob.cancel()
-            errJob.cancel()
+            listOf(exitCodeJob, outJob, errJob).forEach { it.cancel() }
         }
-    }.flowOn(coroutineDispatcher)
-        .onEach { println("ScriptExecution: $it") }
+    }.flowOn(ioDispatcher)
+        .onEach { println("ScriptExecution: $it") } // TODO: replace with Logging
 
     private suspend fun ProducerScope<ExecutionEvent>.processStdErr(process: Process) {
         try {

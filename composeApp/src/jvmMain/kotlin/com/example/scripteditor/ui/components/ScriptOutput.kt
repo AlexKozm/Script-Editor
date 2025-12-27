@@ -9,13 +9,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.snapshots.SnapshotStateList
@@ -29,11 +26,11 @@ import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withLink
 import androidx.compose.ui.unit.dp
-import com.example.scripteditor.core.repositories.ExecutionEvent
-import com.example.scripteditor.core.repositories.ExecutionEvent.Finished
-import com.example.scripteditor.core.repositories.ExecutionEvent.StdErr
-import com.example.scripteditor.core.repositories.ExecutionEvent.StdOut
-import com.example.scripteditor.core.repositories.ExecutionEvent.SystemError
+import com.example.scripteditor.core.ExecutionEvent
+import com.example.scripteditor.core.ExecutionEvent.Finished
+import com.example.scripteditor.core.ExecutionEvent.StdErr
+import com.example.scripteditor.core.ExecutionEvent.StdOut
+import com.example.scripteditor.core.ExecutionEvent.SystemError
 import org.jetbrains.compose.ui.tooling.preview.Preview
 
 @Composable
