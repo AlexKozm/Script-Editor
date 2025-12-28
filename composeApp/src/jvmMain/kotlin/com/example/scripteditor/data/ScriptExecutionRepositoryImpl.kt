@@ -10,6 +10,7 @@ import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.job
 import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 import java.io.IOException
@@ -54,7 +55,7 @@ class ScriptExecutionRepositoryImpl(
         try {
             readAndSend(process.errorStream) { ExecutionEvent.StdErr(it) }
         } catch (e: IOException) {
-            send(ExecutionEvent.SystemError("Error stream failure: ${e.localizedMessage}"))
+            send(ExecutionEvent.SystemError("Error stream failure: ${e.message}"))
         }
     }
 
@@ -62,7 +63,7 @@ class ScriptExecutionRepositoryImpl(
         try {
             readAndSend(process.inputStream) { ExecutionEvent.StdOut(it) }
         } catch (e: IOException) {
-            send(ExecutionEvent.SystemError("Read error: ${e.localizedMessage}"))
+            send(ExecutionEvent.SystemError("Read error: ${e.message}"))
         }
     }
 
