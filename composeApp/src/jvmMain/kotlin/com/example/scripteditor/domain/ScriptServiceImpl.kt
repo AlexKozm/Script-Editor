@@ -12,8 +12,7 @@ class ScriptServiceImpl(
 ) : ScriptService {
 
     private val _scriptOutput: MutableSharedFlow<ExecutionEvent> = MutableSharedFlow()
-    // only for
-    override val indexedScriptOutput: SharedFlow<ExecutionEvent> = _scriptOutput.asSharedFlow()
+    override val scriptOutput: SharedFlow<ExecutionEvent> = _scriptOutput.asSharedFlow()
 
     private val _executionState: MutableStateFlow<ExecutionState> = MutableStateFlow(ExecutionState.STOPPED)
     override val executionState: StateFlow<ExecutionState> = _executionState

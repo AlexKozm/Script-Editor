@@ -7,7 +7,7 @@ import kotlinx.coroutines.flow.StateFlow
 
 
 interface ScriptService {
-    val indexedScriptOutput: SharedFlow<ExecutionEvent>
+    val scriptOutput: SharedFlow<ExecutionEvent>
     val executionState: StateFlow<ExecutionState>
 
     suspend fun runScript(command: String, arguments: List<String>)

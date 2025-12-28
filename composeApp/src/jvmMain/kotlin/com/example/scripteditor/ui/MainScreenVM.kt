@@ -31,7 +31,7 @@ class MainScreenVM(
 
     init {
         viewModelScope.launch {
-            scriptService.indexedScriptOutput.withIndex().flowOn(Dispatchers.Default).collect { event ->
+            scriptService.scriptOutput.withIndex().flowOn(Dispatchers.Default).collect { event ->
                 mutableStateListOutput.add(event)
                 if (mutableStateListOutput.size > 30000) mutableStateListOutput.removeFirst()
                 yield()
