@@ -85,11 +85,16 @@ private val codeEditorOutputTransformation = OutputTransformation {
         }
 }
 
-// TODO: works laggy (try in the center of a text). Delete or fix
 private val codeEditorInputTransformation = InputTransformation {
     if (asCharSequence().contains("\t")) {
-        val newText = asCharSequence().toString().replace("\t", "    ")
+        val allTabs = asCharSequence().toString()
+            .withIndex()
+            .filter { it.value == '\t' }
+        val replaceTabWithString = "    "
+        val newText = asCharSequence().toString().replace("\t", replaceTabWithString)
+        val newCursorPlace = allTabs.last().index + allTabs.size * (replaceTabWithString.length - 1)
         replace(0, length, newText)
+        placeCursorAfterCharAt(newCursorPlace)
     }
 }
 
