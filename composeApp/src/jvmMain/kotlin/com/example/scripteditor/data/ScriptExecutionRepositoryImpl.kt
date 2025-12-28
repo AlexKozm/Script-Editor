@@ -3,14 +3,11 @@ package com.example.scripteditor.data
 import com.example.scripteditor.core.ExecutionEvent
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.ProducerScope
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.onEach
-import kotlinx.coroutines.job
 import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 import java.io.IOException
@@ -26,7 +23,7 @@ class ScriptExecutionRepositoryImpl(
         val process: Process = try {
             ProcessBuilder(command, *arguments.toTypedArray()).redirectErrorStream(false).start()
         } catch (e: IOException) {
-            send(ExecutionEvent.SystemError("Failed to start process: ${e.localizedMessage}"))
+            send(ExecutionEvent.SystemError("Failed to start process: ${e.message}"))
             close()
             return@callbackFlow
         }
@@ -78,3 +75,5 @@ class ScriptExecutionRepositoryImpl(
         }
     }
 }
+
+actual fun ScriptExecutionRepository(): ScriptExecutionRepository = ScriptExecutionRepositoryImpl()

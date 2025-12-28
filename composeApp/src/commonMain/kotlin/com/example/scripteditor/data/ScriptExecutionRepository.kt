@@ -6,3 +6,5 @@ import kotlinx.coroutines.flow.Flow
 interface ScriptExecutionRepository {
     fun run(command: String, arguments: List<String>): Flow<ExecutionEvent>
 }
+
+expect fun ScriptExecutionRepository(): ScriptExecutionRepository

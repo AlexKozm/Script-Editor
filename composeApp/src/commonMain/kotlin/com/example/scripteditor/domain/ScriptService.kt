@@ -1,7 +1,8 @@
 package com.example.scripteditor.domain
 
-import com.example.scripteditor.core.ExecutionState
 import com.example.scripteditor.core.ExecutionEvent
+import com.example.scripteditor.core.ExecutionState
+
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 

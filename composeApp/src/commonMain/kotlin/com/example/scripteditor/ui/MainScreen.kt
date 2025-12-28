@@ -1,36 +1,24 @@
 package com.example.scripteditor.ui
 
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.*
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.text.input.TextEditorState
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.scripteditor.core.ExecutionEvent
-import com.example.scripteditor.core.ExecutionEvent.Finished
-import com.example.scripteditor.core.ExecutionEvent.StdErr
-import com.example.scripteditor.core.ExecutionEvent.StdOut
 import com.example.scripteditor.core.ExecutionState
+import com.example.scripteditor.domain.getCursorPlace
 import com.example.scripteditor.ui.components.ScriptEditor
 import com.example.scripteditor.ui.components.ScriptOutput
-import com.example.scripteditor.domain.getCursorPlace
 import com.example.scripteditor.ui.components.TopBar
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.ui.tooling.preview.Preview
@@ -102,7 +90,8 @@ fun MainScreen(
                             codeEditorState.edit { placeCursorAfterCharAt(place) }
                             scriptFocusRequester.requestFocus()
                         }
-                    } catch (_: IllegalArgumentException) {}
+                    } catch (_: IllegalArgumentException) {
+                    }
                 }
             )
         }
@@ -113,9 +102,9 @@ fun MainScreen(
 @Composable
 private fun MainScreenPreview() {
     val list = listOf(
-        StdOut("result: 1"),
-        Finished(0),
-        StdErr("some-file.kts:2:3: error: Something")
+        ExecutionEvent.StdOut("result: 1"),
+        ExecutionEvent.Finished(0),
+        ExecutionEvent.StdErr("some-file.kts:2:3: error: Something")
     )
     val textFieldState = TextFieldState("""
         fun a() {

@@ -10,19 +10,11 @@ import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.Save
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.example.scripteditor.core.ExecutionEvent
-import com.example.scripteditor.core.ExecutionEvent.Finished
-import com.example.scripteditor.core.ExecutionEvent.StdErr
-import com.example.scripteditor.core.ExecutionEvent.StdOut
 import com.example.scripteditor.core.ExecutionState
-import com.example.scripteditor.ui.MainScreen
 import org.jetbrains.compose.ui.tooling.preview.Preview
 
 @Composable

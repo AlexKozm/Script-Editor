@@ -8,8 +8,7 @@ private data class Data(
     val name: String,
     val script: String,
     val errorText: String,
-    // as script from the beginning till cursor position
-    val expectedScriptUntilCursor: String?
+    val expectedScriptUntilCursor: String? // script from the beginning till cursor position
 )
 
 class ParseExecutionErrorForScriptRefTest : FunSpec({
@@ -90,12 +89,11 @@ class ParseExecutionErrorForScriptRefTest : FunSpec({
 
     withData(
         nameFn = { it.name },
-        ts = data
+        data
     ) { (_, script, errorText, expectedScriptUntilCursor) ->
         val scriptUntilCursor = parseExecutionErrorForScriptRef(errorText)
             ?.getCursorPlace(script)
             ?.let { script.slice(0..it) }
         scriptUntilCursor shouldBe expectedScriptUntilCursor
     }
-
 })

@@ -18,7 +18,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.*
 import androidx.compose.ui.unit.dp
 import com.example.scripteditor.core.ExecutionEvent
-import com.example.scripteditor.core.ExecutionEvent.*
 import com.example.scripteditor.domain.ExecutionErrorWithLink
 import com.example.scripteditor.domain.parseExecutionErrorForScriptRef
 import org.jetbrains.compose.ui.tooling.preview.Preview
@@ -65,13 +64,13 @@ fun ScriptOutput(
 private fun ExecutionEvent.getLine(
     onErrLinkClick: ExecutionErrorWithLink.() -> Unit
 ) = when (this) {
-    is Finished -> buildAnnotatedString { append("FINISHED. Code: $exitCode") }
-    is StdOut -> buildAnnotatedString { append("Out: $line") }
-    is StdErr -> errAnnotatedString(onErrLinkClick)
-    is SystemError -> buildAnnotatedString { append("ERR: $message") }
+    is ExecutionEvent.Finished -> buildAnnotatedString { append("FINISHED. Code: $exitCode") }
+    is ExecutionEvent.StdOut -> buildAnnotatedString { append("Out: $line") }
+    is ExecutionEvent.StdErr -> errAnnotatedString(onErrLinkClick)
+    is ExecutionEvent.SystemError -> buildAnnotatedString { append("ERR: $message") }
 }
 
-private fun StdErr.errAnnotatedString(
+private fun ExecutionEvent.StdErr.errAnnotatedString(
     onErrLinkClick: ExecutionErrorWithLink.() -> Unit
 ): AnnotatedString {
     val parsedError = parseExecutionErrorForScriptRef(
@@ -95,9 +94,9 @@ private fun StdErr.errAnnotatedString(
 @Composable
 private fun ScriptOutputPreview() {
     val list = listOf(
-        StdOut("result: 1"),
-        Finished(0),
-        StdErr("some-file.kts:2:3: error: Something")
+        ExecutionEvent.StdOut("result: 1"),
+        ExecutionEvent.Finished(0),
+        ExecutionEvent.StdErr("some-file.kts:2:3: error: Something")
     )
     val textStateList = remember { mutableStateListOf<IndexedValue<ExecutionEvent>>() }
     textStateList.addAll(list.withIndex())

@@ -6,8 +6,8 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.mutableStateListOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.scripteditor.core.ExecutionState
 import com.example.scripteditor.core.ExecutionEvent
+import com.example.scripteditor.core.ExecutionState
 import com.example.scripteditor.domain.LoadFileUseCase
 import com.example.scripteditor.domain.SaveFileUseCase
 import com.example.scripteditor.domain.ScriptService

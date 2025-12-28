@@ -1,4 +1,5 @@
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
+import org.jetbrains.kotlin.gradle.tasks.KotlinTest
 
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
@@ -6,6 +7,7 @@ plugins {
     alias(libs.plugins.composeCompiler)
     alias(libs.plugins.composeHotReload)
     alias(libs.plugins.kotest)
+    alias(libs.plugins.ksp)
 }
 
 kotlin {
@@ -26,23 +28,27 @@ kotlin {
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
+            implementation(libs.kotest)
+            implementation(libs.kotest.assertions)
         }
         jvmMain.dependencies {
             implementation(compose.desktop.currentOs)
             implementation(libs.kotlinx.coroutinesSwing)
         }
         jvmTest.dependencies {
-            implementation(libs.kotest)
-            implementation(libs.kotest.assertions)
             implementation(libs.kotest.junit)
         }
     }
 }
 
-tasks.withType<Test>().configureEach {
+tasks.named<Test>("jvmTest") {
     useJUnitPlatform()
     logger.lifecycle("UP-TO-DATE check for $name is disabled, forcing it to run.")
     outputs.upToDateWhen { false }
+}
+
+tasks.withType<KotlinTest>().configureEach {
+    failOnNoDiscoveredTests = false
 }
 
 compose.desktop {

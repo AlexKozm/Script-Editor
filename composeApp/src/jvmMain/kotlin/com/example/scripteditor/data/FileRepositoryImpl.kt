@@ -29,3 +29,5 @@ class FilesRepositoryImpl(
         }
     }
 }
+
+actual fun FilesRepository(): FilesRepository = FilesRepositoryImpl()

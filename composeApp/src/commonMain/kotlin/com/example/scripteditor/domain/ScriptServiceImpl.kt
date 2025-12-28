@@ -3,12 +3,11 @@ package com.example.scripteditor.domain
 import com.example.scripteditor.core.ExecutionEvent
 import com.example.scripteditor.core.ExecutionState
 import com.example.scripteditor.data.ScriptExecutionRepository
-import com.example.scripteditor.data.ScriptExecutionRepositoryImpl
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 
 class ScriptServiceImpl(
-    private val scriptExecutionRepository: ScriptExecutionRepository = ScriptExecutionRepositoryImpl(),
+    private val scriptExecutionRepository: ScriptExecutionRepository = ScriptExecutionRepository(),
 ) : ScriptService {
 
     private val _scriptOutput: MutableSharedFlow<ExecutionEvent> = MutableSharedFlow()
