@@ -5,6 +5,7 @@ plugins {
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.composeCompiler)
     alias(libs.plugins.composeHotReload)
+    alias(libs.plugins.kotest)
 }
 
 kotlin {
@@ -30,9 +31,19 @@ kotlin {
             implementation(compose.desktop.currentOs)
             implementation(libs.kotlinx.coroutinesSwing)
         }
+        jvmTest.dependencies {
+            implementation(libs.kotest)
+            implementation(libs.kotest.assertions)
+            implementation(libs.kotest.junit)
+        }
     }
 }
 
+tasks.withType<Test>().configureEach {
+    useJUnitPlatform()
+    logger.lifecycle("UP-TO-DATE check for $name is disabled, forcing it to run.")
+    outputs.upToDateWhen { false }
+}
 
 compose.desktop {
     application {

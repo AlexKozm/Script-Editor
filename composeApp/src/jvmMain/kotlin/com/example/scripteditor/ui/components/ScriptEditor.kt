@@ -33,32 +33,19 @@ fun ScriptEditor(
         modifier = modifier.fillMaxSize()
     ) {
         val scrollState = rememberScrollState()
-        Box (
-            modifier = Modifier.fillMaxSize()
-                .padding(8.dp)
-        ) {
+        WithAlwaysVisibleVerticalScrollbar(
+            modifier = Modifier.fillMaxSize().padding(8.dp),
+            scrollState = rememberScrollbarAdapter(scrollState),
+        ) { leftPadding ->
             OutlinedTextField(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(end = 16.dp),
+                    .padding(end = leftPadding + 4.dp),
                 state = textFieldState,
                 inputTransformation = codeEditorInputTransformation,
                 outputTransformation = codeEditorOutputTransformation,
                 scrollState = scrollState,
             )
-            Box(
-                modifier = Modifier
-                    .align(Alignment.CenterEnd)
-                    .fillMaxHeight()
-                    .background(Color.Black.copy(alpha = 0.05f))
-            ) {
-                VerticalScrollbar(
-                    adapter = rememberScrollbarAdapter(scrollState),
-                    modifier = Modifier
-                        .align(Alignment.CenterEnd)
-                        .fillMaxHeight()
-                )
-            }
         }
     }
 }
@@ -100,7 +87,7 @@ private val codeEditorInputTransformation = InputTransformation {
 
 @Preview
 @Composable
-fun PreviewCodeEditor() {
+private fun PreviewCodeEditor() {
     val textFieldState = TextFieldState("""
         fun a() {
             var l = 1

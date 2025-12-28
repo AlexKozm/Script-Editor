@@ -1,56 +1,47 @@
 package com.example.scripteditor.ui.components
 
-import androidx.compose.foundation.VerticalScrollbar
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollbarAdapter
-import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.Card
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshots.SnapshotStateList
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.LinkAnnotation
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.TextLinkStyles
-import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.withLink
+import androidx.compose.ui.text.*
 import androidx.compose.ui.unit.dp
 import com.example.scripteditor.core.ExecutionEvent
-import com.example.scripteditor.core.ExecutionEvent.Finished
-import com.example.scripteditor.core.ExecutionEvent.StdErr
-import com.example.scripteditor.core.ExecutionEvent.StdOut
-import com.example.scripteditor.core.ExecutionEvent.SystemError
+import com.example.scripteditor.core.ExecutionEvent.*
+import com.example.scripteditor.domain.ExecutionErrorWithLink
+import com.example.scripteditor.domain.parseExecutionErrorForScriptRef
 import org.jetbrains.compose.ui.tooling.preview.Preview
 
 @Composable
 fun ScriptOutput(
     modifier: Modifier = Modifier,
     state: SnapshotStateList<IndexedValue<ExecutionEvent>>,
-    focusRequester: FocusRequester,
-    textFieldState: TextFieldState
+    onErrLinkClick: ExecutionErrorWithLink.() -> Unit
 ) {
     Card (
         modifier = modifier.fillMaxSize()
     ) {
-        val scrollState = rememberLazyListState()
-        Box (
-            modifier = Modifier.fillMaxSize()
-                .padding(8.dp)
-        ) {
-            SelectionContainer {
+        val lazyListState = rememberLazyListState()
+        WithAlwaysVisibleVerticalScrollbar(
+            modifier = Modifier.fillMaxSize().padding(8.dp),
+            scrollState = rememberScrollbarAdapter(lazyListState),
+        ) { leftPadding ->
+            SelectionContainer(
+                modifier = modifier.padding(end = leftPadding),
+            ) {
                 LazyColumn(
-                    state = scrollState,
+                    state = lazyListState,
                 ) {
                     items(
                         items = state,
@@ -60,82 +51,58 @@ fun ScriptOutput(
                             modifier = Modifier
                                 .fillMaxSize()
                                 .padding(end = 16.dp),
-                            text = it.value.getLine(textFieldState, focusRequester),
+                            text = it.value.getLine(onErrLinkClick),
                         )
                     }
                 }
-            }
-            Box(
-                modifier = Modifier
-                    .align(Alignment.CenterEnd)
-                    .fillMaxHeight()
-                    .background(Color.Black.copy(alpha = 0.05f))
-            ) {
-                VerticalScrollbar(
-                    adapter = rememberScrollbarAdapter(scrollState),
-                    modifier = Modifier
-                        .align(Alignment.CenterEnd)
-                        .fillMaxHeight()
-                )
             }
         }
     }
 }
 
-fun ExecutionEvent.getLine(
-    textFieldState: TextFieldState,
-    focusRequester: FocusRequester
+
+
+private fun ExecutionEvent.getLine(
+    onErrLinkClick: ExecutionErrorWithLink.() -> Unit
 ) = when (this) {
     is Finished -> buildAnnotatedString { append("FINISHED. Code: $exitCode") }
     is StdOut -> buildAnnotatedString { append("Out: $line") }
-    is StdErr -> {
-        val regex = Regex(""":(\d+):(\d+):""")
-        val res = regex.find(line)
-
-        buildAnnotatedString {
-            if (res == null) {
-                append(line)
-                return@buildAnnotatedString
-            }
-
-            val lineNum = res.groups[1]?.value?.toIntOrNull()
-            val charNum = res.groups[2]?.value?.toIntOrNull()
-
-            val file = res.groups[0]?.range?.first?.let { line.slice(0 until it) }
-            val err = res.groups[0]?.range?.last?.let { line.slice(it until line.length) }
-            val tag = "$file:$lineNum:$charNum"
-
-            val link = LinkAnnotation.Clickable(
-                tag = tag,
-                styles = TextLinkStyles(SpanStyle(color = Color.Blue)),
-                linkInteractionListener = {
-                    textFieldState.edit {
-                        if (lineNum != null && charNum != null) {
-                            val place = originalText.toString()
-                                .split("\n")
-                                .take(lineNum)
-                                .mapIndexed { index, string ->
-                                    if (index != lineNum - 1) string.length else charNum
-                                }
-                                .sum()
-                            placeCursorAfterCharAt(place) // TODO: catch
-                        }
-                    }
-                    focusRequester.requestFocus()
-                }
-            )
-            withLink(link) { append(tag) }
-            append(err)
-        }
-    }
+    is StdErr -> errAnnotatedString(onErrLinkClick)
     is SystemError -> buildAnnotatedString { append("ERR: $message") }
+}
+
+private fun StdErr.errAnnotatedString(
+    onErrLinkClick: ExecutionErrorWithLink.() -> Unit
+): AnnotatedString {
+    val parsedError = parseExecutionErrorForScriptRef(
+        errLine = line,
+    )
+    return if (parsedError == null) buildAnnotatedString { append(line) }
+    else buildAnnotatedString {
+        val link = LinkAnnotation.Clickable(
+            tag = parsedError.link,
+            styles = TextLinkStyles(SpanStyle(color = Color.Blue)),
+            linkInteractionListener = {
+                parsedError.onErrLinkClick()
+            }
+        )
+        withLink(link) { append(parsedError.link) }
+        append(parsedError.err)
+    }
 }
 
 @Preview
 @Composable
 private fun ScriptOutputPreview() {
-//    ScriptOutput(text = """
-//        Some output
-//        of this program
-//    """.trimIndent())
+    val list = listOf(
+        StdOut("result: 1"),
+        Finished(0),
+        StdErr("some-file.kts:2:3: error: Something")
+    )
+    val textStateList = remember { mutableStateListOf<IndexedValue<ExecutionEvent>>() }
+    textStateList.addAll(list.withIndex())
+    ScriptOutput(
+        state = textStateList,
+        onErrLinkClick = {}
+    )
 }

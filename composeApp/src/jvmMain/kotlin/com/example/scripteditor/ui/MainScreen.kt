@@ -1,36 +1,37 @@
 package com.example.scripteditor.ui
 
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Download
-import androidx.compose.material.icons.outlined.Save
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
+import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.ui.Alignment
+import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.text.input.TextEditorState
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.scripteditor.ui.components.RunAndStopButton
+import com.example.scripteditor.core.ExecutionEvent
+import com.example.scripteditor.core.ExecutionEvent.Finished
+import com.example.scripteditor.core.ExecutionEvent.StdErr
+import com.example.scripteditor.core.ExecutionEvent.StdOut
+import com.example.scripteditor.core.ExecutionState
 import com.example.scripteditor.ui.components.ScriptEditor
 import com.example.scripteditor.ui.components.ScriptOutput
-import com.example.scripteditor.ui.components.SmallTextField
+import com.example.scripteditor.domain.getCursorPlace
+import com.example.scripteditor.ui.components.TopBar
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.ui.tooling.preview.Preview
 
@@ -38,84 +39,102 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
 fun MainScreen(
     vm: MainScreenVM = viewModel(),
 ) {
-
-    val executionState by vm.executionState.collectAsStateWithLifecycle()
-    val output = vm.mutableStateListOutput
     val coroutineScope = rememberCoroutineScope()
+    val executionState by vm.executionState.collectAsStateWithLifecycle()
 
+    MainScreen(
+        onOpenFileClick = { coroutineScope.launch { vm.loadScript() } },
+        onSaveClick = { coroutineScope.launch { vm.saveScript() } },
+        onRunOrStopClick = { coroutineScope.launch { vm.nextExecutionState() } },
+        executionState = executionState,
+        commandTextFieldState = vm.commandWithFlagsTextFieldState,
+        fileTextFieldState = vm.filePathTextFieldState,
+        snackbarHostState = vm.snackbarHostState,
+        mutableStateListOutput = vm.mutableStateListOutput,
+        codeEditorState = vm.codeEditorState,
+    )
+}
 
+@Composable
+fun MainScreen(
+    onOpenFileClick: () -> Unit,
+    onSaveClick: () -> Unit,
+    onRunOrStopClick: () -> Unit,
+    executionState: ExecutionState,
+    commandTextFieldState: TextFieldState,
+    fileTextFieldState: TextFieldState,
+
+    snackbarHostState: SnackbarHostState,
+    mutableStateListOutput: SnapshotStateList<IndexedValue<ExecutionEvent>>,
+    codeEditorState: TextFieldState
+) {
     Scaffold(
         snackbarHost = {
-            SnackbarHost(hostState = vm.snackbarHostState)
+            SnackbarHost(hostState = snackbarHostState)
         },
-    ) {
-        Column(
-            modifier = Modifier.fillMaxWidth(),
+        topBar = {
+            TopBar(
+                onOpenFileClick = onOpenFileClick,
+                onSaveClick = onSaveClick,
+                onRunOrStopClick = onRunOrStopClick,
+                executionState = executionState,
+                commandTextFieldState = commandTextFieldState,
+                fileTextFieldState = fileTextFieldState,
+            )
+        }
+    ) { paddingValues ->
+        Row(
+            modifier = Modifier.padding(paddingValues).fillMaxSize()
         ) {
-            Row {
-                IconButton(
-                    modifier = Modifier.align(Alignment.CenterVertically),
-                    onClick = { coroutineScope.launch { vm.loadScript() } }
-                ){
-                    Icon(Icons.Outlined.Download, contentDescription = "Open file")
+            val scriptFocusRequester = remember { FocusRequester() }
+            ScriptEditor(
+                modifier = Modifier.weight(1f).focusRequester(scriptFocusRequester),
+                textFieldState = codeEditorState,
+            )
+            Spacer(Modifier.width(4.dp))
+            ScriptOutput(
+                modifier = Modifier.weight(1f),
+                state = mutableStateListOutput,
+                onErrLinkClick = {
+                    try {
+                        val place = getCursorPlace(codeEditorState.text.toString())
+                        if (place != null) {
+                            codeEditorState.edit { placeCursorAfterCharAt(place) }
+                            scriptFocusRequester.requestFocus()
+                        }
+                    } catch (_: IllegalArgumentException) {}
                 }
-                IconButton(
-                    modifier = Modifier.align(Alignment.CenterVertically),
-                    onClick = { coroutineScope.launch { vm.saveScript() } }
-                ){
-                    Icon(Icons.Outlined.Save, contentDescription = "Save")
-                }
-                RunAndStopButton(
-                    modifier = Modifier.align(Alignment.CenterVertically),
-                    onClick = { coroutineScope.launch { vm.nextExecutionState() } },
-                    state = executionState
-                )
-                Spacer(modifier = Modifier.width(10.dp))
-                Text(
-                    modifier = Modifier.align(Alignment.CenterVertically),
-                    text = "Command: "
-                )
-                SmallTextField(
-                    modifier = Modifier.align(Alignment.CenterVertically)
-                        .widthIn(50.dp, 300.dp),
-                    state = vm.commandWithFlagsTextFieldState
-                )
-                Spacer(modifier = Modifier.width(10.dp))
-                Text(
-                    modifier = Modifier.align(Alignment.CenterVertically),
-                    text = "path: "
-                )
-                SmallTextField(
-                    modifier = Modifier.align(Alignment.CenterVertically)
-                        .widthIn(50.dp, 300.dp),
-                    state = vm.filePathTextFieldState
-                )
-            }
-            Row(
-                modifier = Modifier.fillMaxSize()
-            ) {
-                val focusRequester = remember { FocusRequester() }
-                ScriptEditor(
-                    modifier = Modifier.weight(1f).focusRequester(focusRequester),
-                    textFieldState = vm.codeEditorState,
-                )
-                Spacer(Modifier.width(4.dp))
-                ScriptOutput(
-                    modifier = Modifier.weight(1f),
-                    state = output,
-                    textFieldState = vm.codeEditorState,
-                    focusRequester = focusRequester
-                )
-
-            }
+            )
         }
     }
-
-
 }
 
 @Preview
 @Composable
-fun MainScreenPreview() {
-    MainScreen()
+private fun MainScreenPreview() {
+    val list = listOf(
+        StdOut("result: 1"),
+        Finished(0),
+        StdErr("some-file.kts:2:3: error: Something")
+    )
+    val textFieldState = TextFieldState("""
+        fun a() {
+            var l = 1
+        }
+        println("hihi")
+    """.trimIndent())
+
+    MainScreen(
+        onOpenFileClick = {},
+        onSaveClick = {},
+        onRunOrStopClick = {},
+        executionState = ExecutionState.STOPPED,
+        commandTextFieldState = rememberTextFieldState("kotlinc -script"),
+        fileTextFieldState = rememberTextFieldState("foo.kts"),
+        snackbarHostState = remember { SnackbarHostState() },
+        mutableStateListOutput = remember {
+            mutableStateListOf<IndexedValue<ExecutionEvent>>().apply { addAll(list.withIndex()) }
+        },
+        codeEditorState = textFieldState,
+    )
 }

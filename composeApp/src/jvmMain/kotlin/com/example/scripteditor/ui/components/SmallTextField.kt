@@ -17,6 +17,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import org.jetbrains.compose.ui.tooling.preview.Preview
 
 @Composable
 fun SmallTextField(
@@ -36,12 +37,24 @@ fun SmallTextField(
             Card {
                 Box(
                     modifier = Modifier
-                        .border(borderWidth, MaterialTheme.colorScheme.primary, MaterialTheme.shapes.medium)
+                        .border(
+                            borderWidth,
+                            MaterialTheme.colorScheme.primary,
+                            MaterialTheme.shapes.medium
+                        )
                         .padding(4.dp)
                 ) {
                     textComposable()
                 }
             }
         }
+    )
+}
+
+@Preview
+@Composable
+private fun SmallTextFieldPreview() {
+    SmallTextField(
+        state = TextFieldState("kotlinc -script")
     )
 }

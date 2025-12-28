@@ -34,18 +34,18 @@ fun RunAndStopButton(
 
 @Preview
 @Composable
-fun RunAndStopButtonPreviewRun() {
+private fun RunAndStopButtonPreviewRun() {
     RunAndStopButton(onClick = {}, state = ExecutionState.STOPPED)
 }
 
 @Preview
 @Composable
-fun RunAndStopButtonPreviewStop() {
+private fun RunAndStopButtonPreviewStop() {
     RunAndStopButton(onClick = {}, state = ExecutionState.RUNNING)
 }
 
 @Preview
 @Composable
-fun RunAndStopButtonPreviewPending() {
+private fun RunAndStopButtonPreviewPending() {
     RunAndStopButton(onClick = {}, state = ExecutionState.STOPPING)
 }
