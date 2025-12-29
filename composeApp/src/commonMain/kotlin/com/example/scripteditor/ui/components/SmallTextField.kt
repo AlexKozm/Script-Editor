@@ -16,6 +16,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import org.jetbrains.compose.ui.tooling.preview.Preview
 
@@ -31,6 +33,8 @@ fun SmallTextField(
     BasicTextField(
         modifier = modifier,
         state = state,
+        textStyle = TextStyle(color = MaterialTheme.colorScheme.onSurface),
+        cursorBrush = SolidColor(MaterialTheme.colorScheme.onSurface),
         lineLimits = TextFieldLineLimits.SingleLine,
         interactionSource = interactionSource,
         decorator = TextFieldDecorator { textComposable ->
@@ -42,7 +46,7 @@ fun SmallTextField(
                             MaterialTheme.colorScheme.primary,
                             MaterialTheme.shapes.medium
                         )
-                        .padding(4.dp)
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
                 ) {
                     textComposable()
                 }

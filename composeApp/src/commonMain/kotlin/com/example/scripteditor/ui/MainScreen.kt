@@ -76,12 +76,12 @@ fun MainScreen(
         ) {
             val scriptFocusRequester = remember { FocusRequester() }
             ScriptEditor(
-                modifier = Modifier.weight(1f).focusRequester(scriptFocusRequester),
+                modifier = Modifier.weight(1f).padding(4.dp).focusRequester(scriptFocusRequester),
                 textFieldState = codeEditorState,
             )
             Spacer(Modifier.width(4.dp))
             ScriptOutput(
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.weight(1f).padding(4.dp),
                 state = mutableStateListOutput,
                 onErrLinkClick = {
                     try {

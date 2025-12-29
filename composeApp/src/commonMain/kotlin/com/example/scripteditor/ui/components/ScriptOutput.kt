@@ -8,10 +8,16 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.Card
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -20,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import com.example.scripteditor.core.ExecutionEvent
 import com.example.scripteditor.domain.ExecutionErrorWithLink
 import com.example.scripteditor.domain.parseExecutionErrorForScriptRef
+import com.example.scripteditor.ui.theme.LocalExtendedColorScheme
 import org.jetbrains.compose.ui.tooling.preview.Preview
 
 @Composable
@@ -32,6 +39,28 @@ fun ScriptOutput(
         modifier = modifier.fillMaxSize()
     ) {
         val lazyListState = rememberLazyListState()
+        var isAtBottom by remember { mutableStateOf(true) }
+
+        LaunchedEffect(lazyListState.firstVisibleItemIndex) {
+            val layoutInfo = lazyListState.layoutInfo
+            val visibleItems = layoutInfo.visibleItemsInfo
+
+            visibleItems.lastOrNull()?.index?.let { lastVisibleItemIndex ->
+                if (lastVisibleItemIndex == layoutInfo.totalItemsCount - 1) {
+                    isAtBottom = true
+                } else if (lazyListState.lastScrolledBackward) {
+                    isAtBottom = false
+                }
+            }
+        }
+        LaunchedEffect(state.lastOrNull()?.index) {
+            if (isAtBottom) {
+                state.lastOrNull()?.let {
+                    lazyListState.scrollToItem(lazyListState.layoutInfo.totalItemsCount - 1)
+                }
+            }
+        }
+
         WithAlwaysVisibleVerticalScrollbar(
             modifier = Modifier.fillMaxSize().padding(8.dp),
             scrollState = rememberScrollbarAdapter(lazyListState),
@@ -61,32 +90,42 @@ fun ScriptOutput(
 
 
 
+@Composable
 private fun ExecutionEvent.getLine(
     onErrLinkClick: ExecutionErrorWithLink.() -> Unit
 ) = when (this) {
-    is ExecutionEvent.Finished -> buildAnnotatedString { append("FINISHED. Code: $exitCode") }
-    is ExecutionEvent.StdOut -> buildAnnotatedString { append("Out: $line") }
+    is ExecutionEvent.Finished -> buildAnnotatedString {
+        withStyle(style = SpanStyle(color = MaterialTheme.colorScheme.secondary)) {append("FINISHED. Code: $exitCode") }
+    }
+    is ExecutionEvent.StdOut -> buildAnnotatedString { append(line) }
     is ExecutionEvent.StdErr -> errAnnotatedString(onErrLinkClick)
-    is ExecutionEvent.SystemError -> buildAnnotatedString { append("ERR: $message") }
+    is ExecutionEvent.SystemError -> buildAnnotatedString {
+        withStyle(style = SpanStyle(color = MaterialTheme.colorScheme.onErrorContainer)) { append("SYSTEM ERR: $message")  }
+    }
 }
 
+@Composable
 private fun ExecutionEvent.StdErr.errAnnotatedString(
-    onErrLinkClick: ExecutionErrorWithLink.() -> Unit
+    onErrLinkClick: ExecutionErrorWithLink.() -> Unit,
+    errorColor: Color = MaterialTheme.colorScheme.error,
+    keyWordsColor: Color = LocalExtendedColorScheme.current.keyWords.color
 ): AnnotatedString {
     val parsedError = parseExecutionErrorForScriptRef(
         errLine = line,
     )
-    return if (parsedError == null) buildAnnotatedString { append(line) }
+    return if (parsedError == null) buildAnnotatedString {
+        withStyle(style = SpanStyle(color = errorColor)) { append(line) }
+    }
     else buildAnnotatedString {
         val link = LinkAnnotation.Clickable(
             tag = parsedError.link,
-            styles = TextLinkStyles(SpanStyle(color = Color.Blue)),
+            styles = TextLinkStyles(SpanStyle(color = keyWordsColor)),
             linkInteractionListener = {
                 parsedError.onErrLinkClick()
             }
         )
         withLink(link) { append(parsedError.link) }
-        append(parsedError.err)
+        withStyle(style = SpanStyle(color = errorColor)) { append(parsedError.err) }
     }
 }
 

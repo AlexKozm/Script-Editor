@@ -77,6 +77,7 @@ class MainScreenVM(
     ) {
         saveScript(filePath, data)
             .onSuccess {
+                mutableStateListOutput.clear()
                 scriptService.runScript(command, listOf(flag, filePath))
             }
     }

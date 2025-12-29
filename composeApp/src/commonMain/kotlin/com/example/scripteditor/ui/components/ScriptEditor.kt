@@ -15,6 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.unit.dp
+import com.example.scripteditor.ui.theme.LocalExtendedColorScheme
 import org.jetbrains.compose.ui.tooling.preview.Preview
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -37,7 +38,7 @@ fun ScriptEditor(
                     .padding(end = leftPadding + 4.dp),
                 state = textFieldState,
                 inputTransformation = codeEditorInputTransformation,
-                outputTransformation = codeEditorOutputTransformation,
+                outputTransformation = codeEditorOutputTransformation(),
                 scrollState = scrollState,
             )
         }
@@ -57,12 +58,16 @@ private val keyWords = setOf(
     "this"
 )
 private val regex = Regex(keyWords.joinToString("\\b|") + "\\b")
-private val codeEditorOutputTransformation = OutputTransformation {
+
+@Composable
+fun codeEditorOutputTransformation(
+    keyWordsColor: Color = LocalExtendedColorScheme.current.keyWords.color,
+) = OutputTransformation {
     regex
         .findAll(asCharSequence())
         .map { it.range }
         .forEach { range ->
-            addStyle(spanStyle = SpanStyle(color = Color.Blue), start = range.first, end = range.last + 1)
+            addStyle(spanStyle = SpanStyle(color = keyWordsColor), start = range.first, end = range.last + 1)
         }
 }
 
