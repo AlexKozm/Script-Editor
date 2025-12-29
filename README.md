@@ -42,4 +42,4 @@ in your IDE’s toolbar or run it directly from the terminal:
 
 ## Demonstration
 
-Watch [video](2025-12-29_16-31-52.mp4)
+Watch [video](https://github.com/AlexKozm/Script-Editor/releases/download/demo-video-v0.0.1/2025-12-29_16-31-52.mp4)
