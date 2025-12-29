@@ -55,7 +55,8 @@ private val keyWords = setOf(
     "class",
     "interface",
     "object",
-    "this"
+    "this",
+    "import"
 )
 private val regex = Regex(keyWords.joinToString("\\b|") + "\\b")
 
