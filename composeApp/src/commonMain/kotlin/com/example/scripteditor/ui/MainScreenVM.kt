@@ -10,46 +10,48 @@ import com.example.scripteditor.core.ExecutionEvent
 import com.example.scripteditor.core.ExecutionState
 import com.example.scripteditor.domain.LoadFileUseCase
 import com.example.scripteditor.domain.SaveFileUseCase
-import com.example.scripteditor.domain.ScriptService
-import com.example.scripteditor.domain.ScriptServiceImpl
-import kotlinx.coroutines.Dispatchers
+import com.example.scripteditor.domain.ScriptStateHolderFactory
+import com.example.scripteditor.domain.ScriptStateHolderFactoryImpl
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.withIndex
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.yield
 
 
 class MainScreenVM(
-    private val scriptService: ScriptService = ScriptServiceImpl(),
     private val loadFileUseCase: LoadFileUseCase = LoadFileUseCase(),
     private val saveFileUseCase: SaveFileUseCase = SaveFileUseCase(),
+    scriptStateHolderFactory: ScriptStateHolderFactory = ScriptStateHolderFactoryImpl()
 ) : ViewModel() {
     val codeEditorState: TextFieldState = TextFieldState()
-    val codeText get() = codeEditorState.text.toString()
+    private val codeText get() = codeEditorState.text.toString()
     val mutableStateListOutput = mutableStateListOf<IndexedValue<ExecutionEvent>>()
-
-    init {
-        viewModelScope.launch {
-            scriptService.scriptOutput.withIndex().flowOn(Dispatchers.Default).collect { event ->
+    private val scriptStateHolder = scriptStateHolderFactory.create(viewModelScope)
+        .apply {
+            scriptOutput
+            .withIndex()
+            .onEach { event ->
                 mutableStateListOutput.add(event)
                 if (mutableStateListOutput.size > 30000) mutableStateListOutput.removeFirst()
                 yield()
             }
+            .launchIn(viewModelScope)
         }
-    }
 
-    val executionState: StateFlow<ExecutionState> get() = scriptService.executionState
+
+
+    val executionState: StateFlow<ExecutionState> = scriptStateHolder.executionState
 
     val snackbarHostState = SnackbarHostState()
 
     val commandWithFlagsTextFieldState: TextFieldState = TextFieldState("kotlinc -script")
     // TODO: make better parsing or make possible to split flags in ui
-    val command get() = commandWithFlagsTextFieldState.text.toString().substringBefore(" -")
-    val flag get() = commandWithFlagsTextFieldState.text.toString().substringAfter(" -").let { "-$it" }
+    private val command get() = commandWithFlagsTextFieldState.text.toString().substringBefore(" -")
+    private val flag get() = commandWithFlagsTextFieldState.text.toString().substringAfter(" -").let { "-$it" }
 
     val filePathTextFieldState: TextFieldState = TextFieldState("foo.kts")
-    val filePath get() = filePathTextFieldState.text.toString()
+    private val filePath get() = filePathTextFieldState.text.toString()
 
     suspend fun loadScript(filePath: String = this.filePath) {
         loadFileUseCase(filePath)
@@ -62,9 +64,9 @@ class MainScreenVM(
     }
 
     suspend fun nextExecutionState() {
-        when (scriptService.executionState.value) {
+        when (scriptStateHolder.executionState.value) {
             ExecutionState.STOPPED -> executeScript()
-            ExecutionState.RUNNING -> scriptService.stopScript()
+            ExecutionState.RUNNING -> scriptStateHolder.stopScript()
             ExecutionState.STOPPING -> {}
         }
     }
@@ -78,7 +80,7 @@ class MainScreenVM(
         saveScript(filePath, data)
             .onSuccess {
                 mutableStateListOutput.clear()
-                scriptService.runScript(command, listOf(flag, filePath))
+                scriptStateHolder.runScript(command, listOf(flag, filePath))
             }
     }
 
