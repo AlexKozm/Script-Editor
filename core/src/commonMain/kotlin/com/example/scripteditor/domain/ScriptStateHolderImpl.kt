@@ -4,19 +4,16 @@ import com.example.scripteditor.core.ExecutionEvent
 import com.example.scripteditor.core.ExecutionState
 import com.example.scripteditor.data.ScriptExecutionRepository
 import kotlinx.coroutines.*
-import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.*
-import kotlin.time.Duration
 
 class ScriptStateHolderImpl(
     private val scriptExecutionRepository: ScriptExecutionRepository = ScriptExecutionRepository(),
-    scope: CoroutineScope
+    private val scope: CoroutineScope
 ) : ScriptStateHolder {
     private val _executionState: MutableStateFlow<ExecutionState> = MutableStateFlow(ExecutionState.STOPPED)
     override val executionState: StateFlow<ExecutionState> = _executionState
 
     private val executionRequestFlow: MutableSharedFlow<ExecutionRequest> = MutableSharedFlow()
-//    private val numOfScriptOutputSubscribers = MutableStateFlow(0)
 
     override val scriptOutput: SharedFlow<ExecutionEvent> = channelFlow {
         executionRequestFlow.collectLatest { request ->
@@ -33,29 +30,21 @@ class ScriptStateHolderImpl(
                 }
             }
         }
-    }
-        .catch { cause ->
-            if (cause is CancellationException) {
-                // mark _executionState as inactive
-            }
-            throw cause
+    }.shareIn(scope = scope, replay = 30000, started = SharingStarted.Eagerly)
+
+
+
+    override fun runScript(command: String, arguments: List<String>) {
+        scope.launch {
+            executionRequestFlow.emit(ExecutionRequest.RunScript(command, arguments))
         }
-        .shareIn(scope = scope, replay = 30000, started = SharingStarted.Eagerly)
-//        .shareIn(scope = scope, replay = 30000, started = { subscriptionCount ->
-//        subscriptionCount.map {
-//            numOfScriptOutputSubscribers.value = it
-//            if (it > 1) SharingCommand.START else SharingCommand.STOP
-//        }
-//    })
+    }
 
-
-
-    override suspend fun runScript(command: String, arguments: List<String>) =
-        executionRequestFlow.emit(ExecutionRequest.RunScript(command, arguments))
-
-    override suspend fun stopScript() {
-        _executionState.value = ExecutionState.STOPPING
-        executionRequestFlow.emit(ExecutionRequest.StopScript)
+    override fun stopScript() {
+        scope.launch {
+            _executionState.value = ExecutionState.STOPPING
+            executionRequestFlow.emit(ExecutionRequest.StopScript)
+        }
     }
 }
 

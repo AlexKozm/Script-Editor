@@ -9,11 +9,10 @@ import kotlinx.coroutines.flow.StateFlow
 interface ScriptStateHolder {
     /**
      * Flow is empty until [runScript] is called.
-     * Script cancels as soon as there are no subscribers or [stopScript] is called.
      */
     val scriptOutput: SharedFlow<ExecutionEvent>
     val executionState: StateFlow<ExecutionState>
 
-    suspend fun runScript(command: String, arguments: List<String>)
-    suspend fun stopScript()
+    fun runScript(command: String, arguments: List<String>)
+    fun stopScript()
 }

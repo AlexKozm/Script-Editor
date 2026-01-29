@@ -26,6 +26,7 @@ class MainScreenVM(
 ) : ViewModel() {
     val codeEditorState: TextFieldState = TextFieldState()
     private val codeText get() = codeEditorState.text.toString()
+
     val mutableStateListOutput = mutableStateListOf<IndexedValue<ExecutionEvent>>()
     private val scriptStateHolder = scriptStateHolderFactory.create(viewModelScope)
         .apply {
@@ -38,7 +39,6 @@ class MainScreenVM(
             }
             .launchIn(viewModelScope)
         }
-
 
 
     val executionState: StateFlow<ExecutionState> = scriptStateHolder.executionState
