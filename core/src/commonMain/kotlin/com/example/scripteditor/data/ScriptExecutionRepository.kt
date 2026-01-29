@@ -1,6 +1,6 @@
 package com.example.scripteditor.data
 
-import com.example.scripteditor.core.ExecutionEvent
+import com.example.scripteditor.core.models.ExecutionEvent
 import kotlinx.coroutines.flow.Flow
 
 interface ScriptExecutionRepository {

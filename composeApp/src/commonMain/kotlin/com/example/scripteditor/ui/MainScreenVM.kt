@@ -6,17 +6,23 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.mutableStateListOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.scripteditor.core.ExecutionEvent
-import com.example.scripteditor.core.ExecutionState
+import com.example.scripteditor.core.flow.batch.BatchCollector
+import com.example.scripteditor.core.flow.batch.BatchFiller
+import com.example.scripteditor.core.flow.batch.batched
+import com.example.scripteditor.core.flow.batch.sequential
+import com.example.scripteditor.core.models.ExecutionEvent
+import com.example.scripteditor.core.models.ExecutionState
 import com.example.scripteditor.domain.LoadFileUseCase
 import com.example.scripteditor.domain.SaveFileUseCase
 import com.example.scripteditor.domain.ScriptStateHolderFactory
 import com.example.scripteditor.domain.ScriptStateHolderFactoryImpl
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.cancellable
 import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.withIndex
-import kotlinx.coroutines.yield
 
 
 class MainScreenVM(
@@ -31,13 +37,19 @@ class MainScreenVM(
     private val scriptStateHolder = scriptStateHolderFactory.create(viewModelScope)
         .apply {
             scriptOutput
-            .withIndex()
-            .onEach { event ->
-                mutableStateListOutput.add(event)
-                if (mutableStateListOutput.size > 30000) mutableStateListOutput.removeFirst()
-                yield()
-            }
-            .launchIn(viewModelScope)
+                .withIndex()
+                .batched(Dispatchers.Default,
+                    fillBatch = BatchFiller.sequential(30000),
+//                    collectBatch = { mutableList ->
+//                        val view = mutableList.subList(0, 100.coerceAtMost(mutableList.size))
+//                        val res = view.toList()
+//                        view.clear()
+//                        res
+//                    }
+                    )
+                .map { batch -> mutableStateListOutput.addAll(batch) }
+                .cancellable()
+                .launchIn(viewModelScope)
         }
 
 

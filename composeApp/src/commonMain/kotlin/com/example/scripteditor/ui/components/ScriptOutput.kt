@@ -22,7 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.*
 import androidx.compose.ui.unit.dp
-import com.example.scripteditor.core.ExecutionEvent
+import com.example.scripteditor.core.models.ExecutionEvent
 import com.example.scripteditor.domain.ExecutionErrorWithLink
 import com.example.scripteditor.domain.parseExecutionErrorForScriptRef
 import com.example.scripteditor.ui.theme.LocalExtendedColorScheme

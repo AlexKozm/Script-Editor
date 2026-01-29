@@ -14,7 +14,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.example.scripteditor.core.ExecutionState
+import com.example.scripteditor.core.models.ExecutionState
 import org.jetbrains.compose.ui.tooling.preview.Preview
 
 @Composable

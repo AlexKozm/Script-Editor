@@ -17,6 +17,7 @@ kotlin {
 //            implementation(libs.kotlin.test)
             implementation(libs.kotest)
             implementation(libs.kotest.assertions)
+            implementation(libs.kotlinx.coroutines.test)
         }
         jvmMain.dependencies {
             implementation(libs.kotlinx.coroutinesSwing)

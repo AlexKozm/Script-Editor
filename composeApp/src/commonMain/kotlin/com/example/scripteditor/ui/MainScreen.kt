@@ -14,8 +14,8 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.scripteditor.core.ExecutionEvent
-import com.example.scripteditor.core.ExecutionState
+import com.example.scripteditor.core.models.ExecutionEvent
+import com.example.scripteditor.core.models.ExecutionState
 import com.example.scripteditor.domain.getCursorPlace
 import com.example.scripteditor.ui.components.ScriptEditor
 import com.example.scripteditor.ui.components.ScriptOutput

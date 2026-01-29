@@ -1,4 +1,4 @@
-package com.example.scripteditor.core
+package com.example.scripteditor.core.models
 
 enum class ExecutionState {
     STOPPED,

@@ -1,4 +1,4 @@
-package com.example.scripteditor.core
+package com.example.scripteditor.core.models
 
 sealed class ExecutionEvent {
     data class StdOut(val line: String) : ExecutionEvent()
