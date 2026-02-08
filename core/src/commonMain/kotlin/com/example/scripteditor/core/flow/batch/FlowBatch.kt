@@ -26,7 +26,7 @@ fun <T> Flow<T>.batched(
     emitterContext: CoroutineContext = EmptyCoroutineContext,
     fillBatch: BatchFiller<T> = BatchFiller.sequential(),
     fillContinueSuspender: suspend (List<T>, ReceiveChannel<Unit>) -> Unit = { list, receiver ->
-        if (list.size > 1) receiver.receive()
+        if (list.size > 1000) receiver.receive()
     },
     collectBatch: BatchCollector<T> = BatchCollector.getAndClear()
 ): Flow<List<T>> = channelFlow<List<T>> {

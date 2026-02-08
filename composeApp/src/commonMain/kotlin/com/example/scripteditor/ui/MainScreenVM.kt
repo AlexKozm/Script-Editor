@@ -49,7 +49,16 @@ class MainScreenVM(
                 .withIndex()
                 .batched(Dispatchers.Default,
                     fillBatch = BatchFiller.sequential(),
-                    collectBatch = BatchCollector.getAndClear()
+                    collectBatch = BatchCollector { mutableList ->
+                        if (mutableStateListOutput.size > 10) {
+                            mutableList.toList().also { mutableList.clear() }
+                        } else {
+                            listOf(mutableList.removeFirst())
+                        }
+                    },
+                    fillContinueSuspender = { list, receiver ->
+                        if (list.size > 1000) receiver.receive()
+                    }
                 )
                 .map { batch ->
                     mutableStateListOutput.addAll(batch)
