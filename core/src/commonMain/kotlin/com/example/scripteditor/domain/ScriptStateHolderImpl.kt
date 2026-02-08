@@ -21,7 +21,9 @@ class ScriptStateHolderImpl(
                 is ExecutionRequest.RunScript -> {
                     _executionState.value = ExecutionState.RUNNING
                     with(request) {
-                        scriptExecutionRepository.run(command, args).collect(::send)
+                        scriptExecutionRepository.run(command, args).collect {
+                            send(it)
+                        }
                     }
                     _executionState.value = ExecutionState.STOPPED
                 }
@@ -30,7 +32,10 @@ class ScriptStateHolderImpl(
                 }
             }
         }
-    }.shareIn(scope = scope, replay = 30000, started = SharingStarted.Eagerly)
+    }
+        .buffer(0)
+        .onEach { println("share $it") }
+        .shareIn(scope = scope + Dispatchers.Default, replay = 0, started = SharingStarted.Eagerly)
 
 
 

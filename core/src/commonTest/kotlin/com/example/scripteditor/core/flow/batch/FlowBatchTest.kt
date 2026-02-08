@@ -49,4 +49,10 @@ class FlowBatchTest: FunSpec({
             listOf(4, 5) to 4002,
         )
     }
+
+    test("Collector should be able to be called more times than emitter works").config(
+        coroutineTestScope = true
+    ) {
+        TODO()
+    }
 })

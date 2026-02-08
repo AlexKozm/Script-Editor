@@ -9,6 +9,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.scripteditor.core.flow.batch.BatchCollector
 import com.example.scripteditor.core.flow.batch.BatchFiller
 import com.example.scripteditor.core.flow.batch.batched
+import com.example.scripteditor.core.flow.batch.getAndClear
 import com.example.scripteditor.core.flow.batch.sequential
 import com.example.scripteditor.core.models.ExecutionEvent
 import com.example.scripteditor.core.models.ExecutionState
@@ -16,13 +17,15 @@ import com.example.scripteditor.domain.LoadFileUseCase
 import com.example.scripteditor.domain.SaveFileUseCase
 import com.example.scripteditor.domain.ScriptStateHolderFactory
 import com.example.scripteditor.domain.ScriptStateHolderFactoryImpl
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.cancellable
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.withIndex
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.plus
 
 
 class MainScreenVM(
@@ -34,20 +37,26 @@ class MainScreenVM(
     private val codeText get() = codeEditorState.text.toString()
 
     val mutableStateListOutput = mutableStateListOf<IndexedValue<ExecutionEvent>>()
-    private val scriptStateHolder = scriptStateHolderFactory.create(viewModelScope)
+    private val scriptStateHolder = scriptStateHolderFactory.create(
+        viewModelScope + CoroutineExceptionHandler { _, throwable ->
+            viewModelScope.launch {
+                snackbarHostState.showSnackbar("${throwable.message}")
+            }
+        }
+    )
         .apply {
             scriptOutput
                 .withIndex()
                 .batched(Dispatchers.Default,
-                    fillBatch = BatchFiller.sequential(30000),
-//                    collectBatch = { mutableList ->
-//                        val view = mutableList.subList(0, 100.coerceAtMost(mutableList.size))
-//                        val res = view.toList()
-//                        view.clear()
-//                        res
-//                    }
-                    )
-                .map { batch -> mutableStateListOutput.addAll(batch) }
+                    fillBatch = BatchFiller.sequential(),
+                    collectBatch = BatchCollector.getAndClear()
+                )
+                .map { batch ->
+                    mutableStateListOutput.addAll(batch)
+                    if (mutableStateListOutput.size > 30000) {
+                        mutableStateListOutput.subList(0, mutableStateListOutput.size - 30000).clear()
+                    }
+                }
                 .cancellable()
                 .launchIn(viewModelScope)
         }

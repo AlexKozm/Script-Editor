@@ -9,6 +9,8 @@ import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ProducerScope
+import kotlinx.coroutines.channels.ReceiveChannel
+import kotlinx.coroutines.channels.SendChannel
 import kotlinx.coroutines.channels.actor
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.coroutineScope
@@ -30,7 +32,7 @@ import java.io.InputStream
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.sequences.forEach
 
-class ScriptExecutionRepositoryImpl(
+class ScriptExecutionSequentialRepositoryImpl(
     val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ): ScriptExecutionRepository {
     override fun run(
@@ -51,20 +53,10 @@ class ScriptExecutionRepositoryImpl(
             coroutineScope {
                 val streamJobs = listOf(
                     launch(CoroutineName("inputStream coroutine")) {
-                        process.inputStream.bufferedReader().use { reader ->
-                            reader.lineSequence().forEach { str ->
-                                dataChannel.send(ExecutionEvent.StdOut(str))
-                                ackChannel.receive()
-                            }
-                        }
+                        dataChannel.processStdOut(process, ackChannel)
                     },
                     launch(CoroutineName("errorStream coroutine")) {
-                        process.errorStream.bufferedReader().use { reader ->
-                            reader.lineSequence().forEach { str ->
-                                dataChannel.send(ExecutionEvent.StdErr(str))
-                                ackChannel.receive()
-                            }
-                        }
+                        dataChannel.processStdErr(process, ackChannel)
                     }
                 )
 
@@ -93,32 +85,40 @@ class ScriptExecutionRepositoryImpl(
         .flowOn(ioDispatcher)
         .onEach { println("ScriptExecution: $it") } // TODO: replace with Logging
 
-    private suspend fun ProducerScope<ExecutionEvent>.processStdErr(process: Process) {
+    private suspend fun SendChannel<ExecutionEvent>.processStdErr(
+        process: Process,
+        ackChannel: ReceiveChannel<Unit>
+    ) {
         try {
-            readAndSend(process.errorStream) { ExecutionEvent.StdErr(it) }
+            readAndSend(process.errorStream, ackChannel) { ExecutionEvent.StdErr(it) }
         } catch (e: IOException) {
             send(ExecutionEvent.SystemError("Error stream failure: ${e.message}"))
         }
     }
 
-    private suspend fun ProducerScope<ExecutionEvent>.processStdOut(process: Process) {
+    private suspend fun SendChannel<ExecutionEvent>.processStdOut(
+        process: Process,
+        ackChannel: ReceiveChannel<Unit>
+    ) {
         try {
-            readAndSend(process.inputStream) { ExecutionEvent.StdOut(it) }
+            readAndSend(process.inputStream, ackChannel) { ExecutionEvent.StdOut(it) }
         } catch (e: IOException) {
             send(ExecutionEvent.SystemError("Read error: ${e.message}"))
         }
     }
 
-    private suspend fun ProducerScope<ExecutionEvent>.readAndSend(
+    private suspend fun SendChannel<ExecutionEvent>.readAndSend(
         stream: InputStream,
+        ackChannel: ReceiveChannel<Unit>,
         block: (String) -> ExecutionEvent
     ) {
         stream.bufferedReader().use { reader ->
             reader.lineSequence().forEach { str ->
                 send(block(str))
+                ackChannel.receive()
             }
         }
     }
 }
 
-actual fun ScriptExecutionRepository(): ScriptExecutionRepository = ScriptExecutionRepositoryImpl()
+//actual fun ScriptExecutionSequentialRepository(): ScriptExecutionRepository = ScriptExecutionRepositoryImpl()
