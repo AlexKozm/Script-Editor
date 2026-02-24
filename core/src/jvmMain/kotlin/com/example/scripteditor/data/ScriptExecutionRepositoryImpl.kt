@@ -2,33 +2,16 @@ package com.example.scripteditor.data
 
 import com.example.scripteditor.core.models.ExecutionEvent
 import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.awaitCancellation
-import kotlinx.coroutines.cancel
-import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ProducerScope
-import kotlinx.coroutines.channels.actor
 import kotlinx.coroutines.channels.awaitClose
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.flow.buffer
 import kotlinx.coroutines.flow.callbackFlow
-import kotlinx.coroutines.flow.catch
-import kotlinx.coroutines.flow.conflate
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.onEach
-import kotlinx.coroutines.handleCoroutineException
 import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.selects.select
-import kotlinx.coroutines.selects.selectUnbiased
-import kotlinx.coroutines.selects.whileSelect
 import java.io.IOException
 import java.io.InputStream
-import kotlin.coroutines.cancellation.CancellationException
-import kotlin.sequences.forEach
 
 class ScriptExecutionRepositoryImpl(
     val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
@@ -36,61 +19,33 @@ class ScriptExecutionRepositoryImpl(
     override fun run(
         command: String,
         arguments: List<String>,
-    ) = flow {
+    ) = callbackFlow {
         val process: Process = try {
             ProcessBuilder(command, *arguments.toTypedArray()).redirectErrorStream(false).start()
         } catch (e: IOException) {
-            emit(ExecutionEvent.SystemError("Failed to start process: ${e.message}"))
-            return@flow
+            send(ExecutionEvent.SystemError("Failed to start process: ${e.message}"))
+            close()
+            return@callbackFlow
         }
 
-        val dataChannel = Channel<ExecutionEvent>()
-        val ackChannel = Channel<Unit>()
+        val outJob = launch { processStdOut(process) }
+        val errJob = launch { processStdErr(process) }
 
-        try {
-            coroutineScope {
-                val streamJobs = listOf(
-                    launch(CoroutineName("inputStream coroutine")) {
-                        process.inputStream.bufferedReader().use { reader ->
-                            reader.lineSequence().forEach { str ->
-                                dataChannel.send(ExecutionEvent.StdOut(str))
-                                ackChannel.receive()
-                            }
-                        }
-                    },
-                    launch(CoroutineName("errorStream coroutine")) {
-                        process.errorStream.bufferedReader().use { reader ->
-                            reader.lineSequence().forEach { str ->
-                                dataChannel.send(ExecutionEvent.StdErr(str))
-                                ackChannel.receive()
-                            }
-                        }
-                    }
-                )
-
-                launch(CoroutineName("process.waitFor")) {
-                    val exitCode = process.waitFor()
-                    streamJobs.joinAll()
-                    ackChannel.close()
-                    dataChannel.send(ExecutionEvent.Finished(exitCode))
-                    dataChannel.close()
-                }
-                launch(CoroutineName("destroyer")) {
-                    try { awaitCancellation() } finally { process.destroy() }
-                }
-
-                for (event in dataChannel) {
-                    emit(event)
-                    if (event !is ExecutionEvent.Finished)
-                        ackChannel.send(Unit)
-                }
-                cancel()
+        val exitCodeJob = launch {
+            try {
+                val exitCode = process.waitFor()
+                listOf(outJob, errJob).joinAll()
+                send(ExecutionEvent.Finished(exitCode))
+            } finally {
+                close()
             }
-        } catch (e: CancellationException) {
-            println("HERE: $e")
         }
-    }
-        .flowOn(ioDispatcher)
+
+        awaitClose {
+            if (process.isAlive) process.destroy()
+            listOf(exitCodeJob, outJob, errJob).forEach { it.cancel() }
+        }
+    }.flowOn(ioDispatcher)
         .onEach { println("ScriptExecution: $it") } // TODO: replace with Logging
 
     private suspend fun ProducerScope<ExecutionEvent>.processStdErr(process: Process) {
