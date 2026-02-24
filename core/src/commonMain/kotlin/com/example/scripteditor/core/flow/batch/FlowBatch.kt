@@ -25,9 +25,7 @@ import kotlin.coroutines.EmptyCoroutineContext
 fun <T> Flow<T>.batched(
     emitterContext: CoroutineContext = EmptyCoroutineContext,
     fillBatch: BatchFiller<T> = BatchFiller.sequential(),
-    fillContinueSuspender: suspend (List<T>, ReceiveChannel<Unit>) -> Unit = { list, receiver ->
-        if (list.size > 1000) receiver.receive()
-    },
+    suspendFiller: suspend List<T>.() -> Boolean = { size > 1000 },
     collectBatch: BatchCollector<T> = BatchCollector.getAndClear()
 ): Flow<List<T>> = channelFlow<List<T>> {
     val mutex = Mutex()
@@ -38,23 +36,18 @@ fun <T> Flow<T>.batched(
         launch(emitterContext) {
             collect { item ->
                 val list = mutex.withLock {
-                    println("Collecting $item; mutableList: $mutableList")
                     fillBatch(mutableList, item)
                     mutableList.toList()
                 }
-                emitSignalChannel.send(Unit)
-                fillContinueSuspender(list, collectSignalChannel)
+                emitSignalChannel.trySend(Unit) // not send because channel is conflated
+                if (suspendFiller(list)) collectSignalChannel.receive()
                 yield()
             }
         }
         emitSignalChannel.consumeEach {
-            val (left, consumed) = mutex.withLock {
-                if (mutableList.isNotEmpty()) {
-                    println("Collecting Batch $mutableList")
-                    val consumed = collectBatch(mutableList)
-                    val left = mutableList.toList()
-                    left to consumed
-                } else emptyList<T>() to emptyList()
+            val consumed = mutex.withLock {
+                if (mutableList.isNotEmpty()) { collectBatch(mutableList) }
+                else emptyList()
             }
             if (consumed.isNotEmpty()) send(consumed)
             collectSignalChannel.send(Unit)
@@ -63,6 +56,9 @@ fun <T> Flow<T>.batched(
     }
 }
 
+/**
+ * Logic of filling mutableList on each item
+ */
 fun interface BatchFiller <T> {
     companion object {}
     operator fun invoke(mutableList: MutableList<T>, item: T)
@@ -82,8 +78,15 @@ fun <T> BatchFiller.Companion.sequentialWithDropping(maxSize: Long) = BatchFille
     }
 }
 
+/**
+ * Logic of getting values from a mutableList
+ */
 fun interface BatchCollector <T> {
     companion object {}
+
+    /**
+     * Returns a list that will be a next item in the outgoing flow
+     */
     operator fun invoke(mutableList: MutableList<T>): List<T>
 }
 
