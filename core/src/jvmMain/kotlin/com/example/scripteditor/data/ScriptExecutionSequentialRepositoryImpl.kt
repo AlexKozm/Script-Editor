@@ -1,36 +1,16 @@
 package com.example.scripteditor.data
 
 import com.example.scripteditor.core.models.ExecutionEvent
-import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.CoroutineName
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.awaitCancellation
-import kotlinx.coroutines.cancel
+import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.channels.ProducerScope
-import kotlinx.coroutines.channels.ReceiveChannel
+import kotlinx.coroutines.channels.ClosedSendChannelException
 import kotlinx.coroutines.channels.SendChannel
-import kotlinx.coroutines.channels.actor
-import kotlinx.coroutines.channels.awaitClose
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.flow.buffer
-import kotlinx.coroutines.flow.callbackFlow
-import kotlinx.coroutines.flow.catch
-import kotlinx.coroutines.flow.conflate
+import kotlinx.coroutines.channels.consumeEach
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
-import kotlinx.coroutines.flow.onEach
-import kotlinx.coroutines.handleCoroutineException
-import kotlinx.coroutines.joinAll
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.selects.select
-import kotlinx.coroutines.selects.selectUnbiased
-import kotlinx.coroutines.selects.whileSelect
 import java.io.IOException
 import java.io.InputStream
 import kotlin.coroutines.cancellation.CancellationException
-import kotlin.sequences.forEach
 
 class ScriptExecutionSequentialRepositoryImpl(
     val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
@@ -46,17 +26,17 @@ class ScriptExecutionSequentialRepositoryImpl(
             return@flow
         }
 
-        val dataChannel = Channel<ExecutionEvent>()
-        val ackChannel = Channel<Unit>()
+        val dataChannel = Channel<ExecutionEvent>(0)
+        val ackChannel = Channel<Unit>(0)
 
         try {
             coroutineScope {
                 val streamJobs = listOf(
                     launch(CoroutineName("inputStream coroutine")) {
-                        dataChannel.processStdOut(process, ackChannel)
+                        process.stdOutTo(dataChannel, ackChannel)
                     },
                     launch(CoroutineName("errorStream coroutine")) {
-                        dataChannel.processStdErr(process, ackChannel)
+                        process.stdErrTo(dataChannel, ackChannel)
                     }
                 )
 
@@ -85,31 +65,25 @@ class ScriptExecutionSequentialRepositoryImpl(
         .flowOn(ioDispatcher)
 //        .onEach { println("ScriptExecution: $it") } // TODO: replace with Logging
 
-    private suspend fun SendChannel<ExecutionEvent>.processStdErr(
-        process: Process,
-        ackChannel: ReceiveChannel<Unit>
-    ) {
+    private suspend fun Process.stdErrTo(dataChannel: SendChannel<ExecutionEvent>, ackChannel: Channel<Unit>) {
         try {
-            readAndSend(process.errorStream, ackChannel) { ExecutionEvent.StdErr(it) }
+            dataChannel.readAndSend(this.errorStream, ackChannel) { ExecutionEvent.StdErr(it) }
         } catch (e: IOException) {
-            send(ExecutionEvent.SystemError("Error stream failure: ${e.message}"))
+            dataChannel.send(ExecutionEvent.SystemError("Error stream failure: ${e.message}"))
         }
     }
 
-    private suspend fun SendChannel<ExecutionEvent>.processStdOut(
-        process: Process,
-        ackChannel: ReceiveChannel<Unit>
-    ) {
+    private suspend fun Process.stdOutTo(dataChannel: SendChannel<ExecutionEvent>, ackChannel: Channel<Unit>) {
         try {
-            readAndSend(process.inputStream, ackChannel) { ExecutionEvent.StdOut(it) }
+            dataChannel.readAndSend(this.inputStream, ackChannel) { ExecutionEvent.StdOut(it) }
         } catch (e: IOException) {
-            send(ExecutionEvent.SystemError("Read error: ${e.message}"))
+            dataChannel.send(ExecutionEvent.SystemError("Read error: ${e.message}"))
         }
     }
 
     private suspend fun SendChannel<ExecutionEvent>.readAndSend(
         stream: InputStream,
-        ackChannel: ReceiveChannel<Unit>,
+        ackChannel: Channel<Unit>,
         block: (String) -> ExecutionEvent
     ) {
         stream.bufferedReader().use { reader ->
