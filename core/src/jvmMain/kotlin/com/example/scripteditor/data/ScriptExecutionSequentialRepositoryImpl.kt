@@ -83,7 +83,7 @@ class ScriptExecutionSequentialRepositoryImpl(
         }
     }
         .flowOn(ioDispatcher)
-        .onEach { println("ScriptExecution: $it") } // TODO: replace with Logging
+//        .onEach { println("ScriptExecution: $it") } // TODO: replace with Logging
 
     private suspend fun SendChannel<ExecutionEvent>.processStdErr(
         process: Process,
