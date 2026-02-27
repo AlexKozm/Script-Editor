@@ -3,57 +3,63 @@ package com.example.scripteditor.domain
 import com.example.scripteditor.core.models.ExecutionEvent
 import com.example.scripteditor.core.models.ExecutionState
 import com.example.scripteditor.data.ScriptExecutionRepository
+import com.example.scripteditor.data.ScriptExecutionSequentialRepository
+import com.example.scripteditor.data.ScriptExecutionStoppableRepository
 import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.channels.ClosedReceiveChannelException
 import kotlinx.coroutines.flow.*
+import kotlin.also
+import kotlin.let
 
 class ScriptStateHolderImpl(
-    private val scriptExecutionRepository: ScriptExecutionRepository = ScriptExecutionRepository(),
+    private val scriptExecutionRepository: ScriptExecutionStoppableRepository = ScriptExecutionSequentialRepository(),
     private val scope: CoroutineScope
 ) : ScriptStateHolder {
     private val _executionState: MutableStateFlow<ExecutionState> = MutableStateFlow(ExecutionState.STOPPED)
     override val executionState: StateFlow<ExecutionState> = _executionState
 
-    private val executionRequestFlow: MutableSharedFlow<ExecutionRequest> = MutableSharedFlow()
+    private val executionRequestFlow: Channel<RunScript> = Channel(0, BufferOverflow.SUSPEND)
+    private val stopSignal: MutableStateFlow<CompletableDeferred<Unit>> = MutableStateFlow(CompletableDeferred())
 
     override val scriptOutput: SharedFlow<ExecutionEvent> = channelFlow {
-        executionRequestFlow.collectLatest { request ->
-            when (request) {
-                is ExecutionRequest.RunScript -> {
-                    _executionState.value = ExecutionState.RUNNING
-                    with(request) {
-                        scriptExecutionRepository.run(command, args).collect {
-                            send(it)
-                        }
+        executionRequestFlow.receiveAsFlow().collectLatest { request ->
+            _executionState.value = ExecutionState.RUNNING
+            try {
+                with(request) {
+                    val stopSignal = stopSignal.value.let {
+                        if (it.isActive) it
+                        else CompletableDeferred<Unit>().also { stopSignal.value = it }
                     }
-                    _executionState.value = ExecutionState.STOPPED
+                    scriptExecutionRepository.run(command, args, stopSignal).collect {
+                        send(it)
+                    }
                 }
-                ExecutionRequest.StopScript -> {
-                    _executionState.value = ExecutionState.STOPPED
-                }
+            } catch (_: ClosedReceiveChannelException) {}
+            finally {
+                _executionState.value = ExecutionState.STOPPED
             }
         }
     }
         .buffer(0)
-        .onEach { println("share $it") }
+//        .onEach { println("share $it") }
         .shareIn(scope = scope + Dispatchers.Default, replay = 0, started = SharingStarted.Eagerly)
 
 
 
     override fun runScript(command: String, arguments: List<String>) {
         scope.launch {
-            executionRequestFlow.emit(ExecutionRequest.RunScript(command, arguments))
+            executionRequestFlow.send(RunScript(command, arguments))
         }
     }
 
     override fun stopScript() {
         scope.launch {
             _executionState.value = ExecutionState.STOPPING
-            executionRequestFlow.emit(ExecutionRequest.StopScript)
+            stopSignal.value.complete(Unit)
         }
     }
 }
 
-private sealed class ExecutionRequest {
-    data class RunScript(val command: String, val args: List<String>) : ExecutionRequest()
-    object StopScript : ExecutionRequest()
-}
+data class RunScript(val command: String, val args: List<String>)

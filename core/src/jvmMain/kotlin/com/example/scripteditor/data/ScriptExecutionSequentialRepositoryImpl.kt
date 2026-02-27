@@ -4,95 +4,104 @@ import com.example.scripteditor.core.models.ExecutionEvent
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ClosedSendChannelException
-import kotlinx.coroutines.channels.SendChannel
-import kotlinx.coroutines.channels.consumeEach
 import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.flowOn
 import java.io.IOException
 import java.io.InputStream
-import kotlin.coroutines.cancellation.CancellationException
 
 class ScriptExecutionSequentialRepositoryImpl(
     val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
-): ScriptExecutionRepository {
+): ScriptExecutionStoppableRepository {
     override fun run(
         command: String,
         arguments: List<String>,
+        stopSignal: CompletableDeferred<Unit>
     ) = flow {
-        val process: Process = try {
+        val process: Process = try { withContext(ioDispatcher) { // start is blocking
             ProcessBuilder(command, *arguments.toTypedArray()).redirectErrorStream(false).start()
-        } catch (e: IOException) {
+        } } catch (e: IOException) {
             emit(ExecutionEvent.SystemError("Failed to start process: ${e.message}"))
             return@flow
         }
 
-        val dataChannel = Channel<ExecutionEvent>(0)
-        val ackChannel = Channel<Unit>(0)
-
-        try {
-            coroutineScope {
-                val streamJobs = listOf(
-                    launch(CoroutineName("inputStream coroutine")) {
-                        process.stdOutTo(dataChannel, ackChannel)
-                    },
-                    launch(CoroutineName("errorStream coroutine")) {
-                        process.stdErrTo(dataChannel, ackChannel)
-                    }
-                )
-
-                launch(CoroutineName("process.waitFor")) {
+        val channel = ChannelWithAck<ExecutionEvent>()
+        coroutineScope {
+            launch {
+                launch(CoroutineName("inputStream coroutine")) { process.stdOutTo(channel) }
+                launch(CoroutineName("errorStream coroutine")) { process.stdErrTo(channel) }
+                launch { try { stopSignal.await() } finally { process.destroy() } }
+                withContext(ioDispatcher) {
                     val exitCode = process.waitFor()
-                    streamJobs.joinAll()
-                    ackChannel.close()
-                    dataChannel.send(ExecutionEvent.Finished(exitCode))
-                    dataChannel.close()
+                    println("Code: $exitCode")
+                    channel.close(ExecutionEvent.Finished(exitCode))
                 }
-                launch(CoroutineName("destroyer")) {
-                    try { awaitCancellation() } finally { process.destroy() }
-                }
-
-                for (event in dataChannel) {
-                    emit(event)
-                    if (event !is ExecutionEvent.Finished)
-                        ackChannel.send(Unit)
-                }
-                cancel()
+                coroutineContext.cancelChildren()
             }
-        } catch (e: CancellationException) {
-            println("HERE: $e")
+            channel.collect {
+                event -> emit(event)
+            }
         }
     }
-        .flowOn(ioDispatcher)
 //        .onEach { println("ScriptExecution: $it") } // TODO: replace with Logging
 
-    private suspend fun Process.stdErrTo(dataChannel: SendChannel<ExecutionEvent>, ackChannel: Channel<Unit>) {
+    private suspend fun Process.stdErrTo(channel: ChannelWithAck<ExecutionEvent>) {
         try {
-            dataChannel.readAndSend(this.errorStream, ackChannel) { ExecutionEvent.StdErr(it) }
+            errorStream.readAndSendTo(channel) { ExecutionEvent.StdErr(it) }
         } catch (e: IOException) {
-            dataChannel.send(ExecutionEvent.SystemError("Error stream failure: ${e.message}"))
+            channel.send(ExecutionEvent.SystemError("Error stream failure: ${e.message}"))
         }
     }
 
-    private suspend fun Process.stdOutTo(dataChannel: SendChannel<ExecutionEvent>, ackChannel: Channel<Unit>) {
+    private suspend fun Process.stdOutTo(channel: ChannelWithAck<ExecutionEvent>) {
         try {
-            dataChannel.readAndSend(this.inputStream, ackChannel) { ExecutionEvent.StdOut(it) }
+            inputStream.readAndSendTo(channel) { ExecutionEvent.StdOut(it) }
         } catch (e: IOException) {
-            dataChannel.send(ExecutionEvent.SystemError("Read error: ${e.message}"))
+            channel.send(ExecutionEvent.SystemError("Read error: ${e.message}"))
         }
     }
 
-    private suspend fun SendChannel<ExecutionEvent>.readAndSend(
-        stream: InputStream,
-        ackChannel: Channel<Unit>,
+    private suspend fun InputStream.readAndSendTo(
+        channel: ChannelWithAck<ExecutionEvent>,
         block: (String) -> ExecutionEvent
-    ) {
-        stream.bufferedReader().use { reader ->
+    ) = withContext(ioDispatcher) {
+        bufferedReader().use { reader ->
             reader.lineSequence().forEach { str ->
-                send(block(str))
-                ackChannel.receive()
+                channel.send(block(str))
             }
         }
     }
 }
 
-//actual fun ScriptExecutionSequentialRepository(): ScriptExecutionRepository = ScriptExecutionRepositoryImpl()
+private class ChannelWithAck<T>(
+    private val dataChannel: Channel<T> = Channel(0),
+    private val ackChannel: Channel<Unit> = Channel(0),
+) {
+    private suspend fun ack() = ackChannel.send(Unit)
+    private suspend fun waitAck() = ackChannel.receive()
+
+    suspend fun send(data: T) {
+        dataChannel.send(data)
+        waitAck()
+    }
+    suspend fun close(lastEvent: T) {
+        ackChannel.close()
+        println("Sending close")
+        dataChannel.send(lastEvent)
+        println("Closing")
+        dataChannel.close()
+    }
+    suspend fun collect(block: suspend (T) -> Unit) {
+        println("Entering collect")
+        for (event in dataChannel) {
+            println("Got event")
+            block(event)
+            println("Emitted")
+            try {
+                ack()
+                println("acknowledged")
+            } catch (_: ClosedSendChannelException) {}
+        }
+        println("About to exit collect")
+    }
+}
+
+actual fun ScriptExecutionSequentialRepository(): ScriptExecutionStoppableRepository = ScriptExecutionSequentialRepositoryImpl()
