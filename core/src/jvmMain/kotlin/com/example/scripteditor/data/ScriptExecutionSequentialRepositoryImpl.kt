@@ -3,6 +3,7 @@ package com.example.scripteditor.data
 import com.example.scripteditor.core.models.ExecutionEvent
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.channels.ClosedReceiveChannelException
 import kotlinx.coroutines.channels.ClosedSendChannelException
 import kotlinx.coroutines.flow.flow
 import java.io.IOException
@@ -26,12 +27,15 @@ class ScriptExecutionSequentialRepositoryImpl(
         val channel = ChannelWithAck<ExecutionEvent>()
         coroutineScope {
             launch {
-                launch(CoroutineName("inputStream coroutine")) { process.stdOutTo(channel) }
-                launch(CoroutineName("errorStream coroutine")) { process.stdErrTo(channel) }
+                val readJobs = listOf(
+                    launch(CoroutineName("inputStream coroutine")) { process.stdOutTo(channel) },
+                    launch(CoroutineName("errorStream coroutine")) { process.stdErrTo(channel) }
+                )
                 launch { try { stopSignal.await() } finally { process.destroy() } }
                 withContext(ioDispatcher) {
                     val exitCode = process.waitFor()
                     println("Code: $exitCode")
+                    readJobs.joinAll()
                     channel.close(ExecutionEvent.Finished(exitCode))
                 }
                 coroutineContext.cancelChildren()
