@@ -3,8 +3,6 @@ package com.example.scripteditor.domain
 import com.example.scripteditor.core.models.ExecutionEvent
 import com.example.scripteditor.core.models.ExecutionState
 import com.example.scripteditor.data.ScriptExecutionRepository
-import com.example.scripteditor.data.ScriptExecutionSequentialRepository
-import com.example.scripteditor.data.ScriptExecutionStoppableRepository
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.Channel
@@ -14,7 +12,7 @@ import kotlin.also
 import kotlin.let
 
 class ScriptStateHolderImpl(
-    private val scriptExecutionRepository: ScriptExecutionStoppableRepository = ScriptExecutionSequentialRepository(),
+    private val scriptExecutionRepository: ScriptExecutionRepository,
     private val scope: CoroutineScope
 ) : ScriptStateHolder {
     private val _executionState: MutableStateFlow<ExecutionState> = MutableStateFlow(ExecutionState.STOPPED)

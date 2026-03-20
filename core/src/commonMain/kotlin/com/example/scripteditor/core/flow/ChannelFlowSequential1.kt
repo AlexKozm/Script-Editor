@@ -19,7 +19,10 @@ fun <T> sequentialChannelFlow1(
 }
     .buffer(0)
     .filterIsInstance<ValueOrPlug.Value<*>>()
-    .map { it.value as T }
+    .map {
+        @Suppress("UNCHECKED_CAST")
+        it.value as T
+    }
 
 private class SequentialChannelFlowCollectorImpl1<T>(
     coroutineScope: CoroutineScope,
@@ -51,4 +54,7 @@ suspend fun <T> ProducerScope<ValueOrPlug<T>>.sendWithPlug(value: T) {
 
 fun <T> Flow<ValueOrPlug<T>>.dropPlugs(): Flow<T> = this
     .filterIsInstance<ValueOrPlug.Value<*>>()
-    .map { it.value as T }
+    .map {
+        @Suppress("UNCHECKED_CAST")
+        it.value as T
+    }

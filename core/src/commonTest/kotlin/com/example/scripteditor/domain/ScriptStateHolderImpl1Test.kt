@@ -84,7 +84,9 @@ class ScriptStateHolderImpl1Test: FunSpec({
     }
 
     test("MutableSharedFlow should be sequential").config(coroutineTestScope = true) {
-        val sharedFlow = f(testCoroutineScheduler).shareIn(this, SharingStarted.Eagerly)
+        val sharedFlow = f(testCoroutineScheduler)
+            .buffer(0)
+            .shareIn(this, SharingStarted.Eagerly)
 
         sharedFlow
             .onEach { println("${testCoroutineScheduler.currentTime}:\t collected $it without delay") }

@@ -3,15 +3,15 @@ package com.example.scripteditor.ui
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.scripteditor.core.flow.batch.BatchCollector
 import com.example.scripteditor.core.flow.batch.BatchFiller
 import com.example.scripteditor.core.flow.batch.batched
-import com.example.scripteditor.core.flow.batch.getAndClear
 import com.example.scripteditor.core.flow.batch.sequential
-import com.example.scripteditor.core.models.ExecutionEvent
 import com.example.scripteditor.core.models.ExecutionState
 import com.example.scripteditor.domain.LoadFileUseCase
 import com.example.scripteditor.domain.SaveFileUseCase
@@ -20,13 +20,21 @@ import com.example.scripteditor.domain.ScriptStateHolderFactoryImpl
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.buffer
 import kotlinx.coroutines.flow.cancellable
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.withIndex
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.plus
+import kotlinx.coroutines.yield
 
+@Immutable
+data class LogLine(
+    val id: Int,
+    val text: String
+)
 
 class MainScreenVM(
     private val loadFileUseCase: LoadFileUseCase = LoadFileUseCase(),
@@ -36,10 +44,11 @@ class MainScreenVM(
     val codeEditorState: TextFieldState = TextFieldState()
     private val codeText get() = codeEditorState.text.toString()
 
-    val mutableStateListOutput = mutableStateListOf<IndexedValue<ExecutionEvent>>()
+    val mutableStateListOutput = mutableStateListOf<LogLine>()
     private val scriptStateHolder = scriptStateHolderFactory.create(
         viewModelScope + CoroutineExceptionHandler { _, throwable ->
             viewModelScope.launch {
+                throwable.stackTrace.forEach { println(it) }
                 snackbarHostState.showSnackbar("${throwable.message}")
             }
         }
@@ -56,16 +65,23 @@ class MainScreenVM(
                             listOf(mutableList.removeFirst())
                         }
                     },
-                    fillContinueSuspender = { list, receiver ->
-                        if (list.size > 1000) receiver.receive()
-                    }
+                    suspendFiller = { size > 1000 }
                 )
                 .map { batch ->
-                    mutableStateListOutput.addAll(batch)
-                    if (mutableStateListOutput.size > 30000) {
-                        mutableStateListOutput.subList(0, mutableStateListOutput.size - 30000).clear()
+                    val list = batch.map { LogLine(it.index, it.value.toString()) }
+                    Snapshot.withMutableSnapshot {
+                        mutableStateListOutput.addAll(list)
+                        if (mutableStateListOutput.size > 30000) {
+                            val toRemove = mutableStateListOutput.size - 30000 + 10000
+                            mutableStateListOutput.removeRange(0, toRemove)
+                        }
                     }
+//                    if (mutableStateListOutput.size > 30000) {
+//                        mutableStateListOutput.subList(0, mutableStateListOutput.size - 30000).clear()
+//                    }
                 }
+                .flowOn(Dispatchers.Default)
+                .buffer(0)
                 .cancellable()
                 .launchIn(viewModelScope)
         }

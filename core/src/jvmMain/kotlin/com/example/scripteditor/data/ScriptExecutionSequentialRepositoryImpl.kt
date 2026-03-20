@@ -3,7 +3,6 @@ package com.example.scripteditor.data
 import com.example.scripteditor.core.models.ExecutionEvent
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.channels.ClosedReceiveChannelException
 import kotlinx.coroutines.channels.ClosedSendChannelException
 import kotlinx.coroutines.flow.flow
 import java.io.IOException
@@ -11,7 +10,7 @@ import java.io.InputStream
 
 class ScriptExecutionSequentialRepositoryImpl(
     val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
-): ScriptExecutionStoppableRepository {
+): ScriptExecutionRepository {
     override fun run(
         command: String,
         arguments: List<String>,
@@ -34,7 +33,7 @@ class ScriptExecutionSequentialRepositoryImpl(
                 launch { try { stopSignal.await() } finally { process.destroy() } }
                 withContext(ioDispatcher) {
                     val exitCode = process.waitFor()
-                    println("Code: $exitCode")
+//                    println("Code: $exitCode")
                     readJobs.joinAll()
                     channel.close(ExecutionEvent.Finished(exitCode))
                 }
@@ -88,24 +87,24 @@ private class ChannelWithAck<T>(
     }
     suspend fun close(lastEvent: T) {
         ackChannel.close()
-        println("Sending close")
+//        println("Sending close")
         dataChannel.send(lastEvent)
-        println("Closing")
+//        println("Closing")
         dataChannel.close()
     }
     suspend fun collect(block: suspend (T) -> Unit) {
-        println("Entering collect")
+//        println("Entering collect")
         for (event in dataChannel) {
-            println("Got event")
+//            println("Got event")
             block(event)
-            println("Emitted")
+//            println("Emitted")
             try {
                 ack()
-                println("acknowledged")
+//                println("acknowledged")
             } catch (_: ClosedSendChannelException) {}
         }
-        println("About to exit collect")
+//        println("About to exit collect")
     }
 }
 
-actual fun ScriptExecutionSequentialRepository(): ScriptExecutionStoppableRepository = ScriptExecutionSequentialRepositoryImpl()
+actual fun ScriptExecutionSequentialRepository(): ScriptExecutionRepository = ScriptExecutionSequentialRepositoryImpl()

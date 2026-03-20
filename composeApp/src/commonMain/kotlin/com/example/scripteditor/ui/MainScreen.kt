@@ -1,5 +1,6 @@
 package com.example.scripteditor.ui
 
+import androidx.compose.animation.core.keyframes
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.text.input.rememberTextFieldState
@@ -30,6 +31,16 @@ fun MainScreen(
     val coroutineScope = rememberCoroutineScope()
     val executionState by vm.executionState.collectAsStateWithLifecycle()
 
+//    LaunchedEffect(Unit) {
+//        var prev = 0L
+//        while (true) {
+//            withFrameNanos { nano ->
+//                println("withFrameNanos: ${nano - prev}")
+//                prev = nano
+//            }
+//        }
+//    }
+
     MainScreen(
         onOpenFileClick = { coroutineScope.launch { vm.loadScript() } },
         onSaveClick = { coroutineScope.launch { vm.saveScript() } },
@@ -53,7 +64,7 @@ fun MainScreen(
     fileTextFieldState: TextFieldState,
 
     snackbarHostState: SnackbarHostState,
-    mutableStateListOutput: SnapshotStateList<IndexedValue<ExecutionEvent>>,
+    mutableStateListOutput: SnapshotStateList<LogLine>,
     codeEditorState: TextFieldState
 ) {
     Scaffold(
@@ -122,7 +133,9 @@ private fun MainScreenPreview() {
         fileTextFieldState = rememberTextFieldState("foo.kts"),
         snackbarHostState = remember { SnackbarHostState() },
         mutableStateListOutput = remember {
-            mutableStateListOf<IndexedValue<ExecutionEvent>>().apply { addAll(list.withIndex()) }
+            mutableStateListOf<LogLine>().apply { addAll(
+                list.withIndex().map { LogLine(it.index, it.value.toString()) }
+            ) }
         },
         codeEditorState = textFieldState,
     )

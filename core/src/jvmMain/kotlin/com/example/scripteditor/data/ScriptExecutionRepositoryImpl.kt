@@ -1,13 +1,17 @@
 package com.example.scripteditor.data
 
 import com.example.scripteditor.core.models.ExecutionEvent
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.channels.ProducerScope
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.future.asDeferred
+import kotlinx.coroutines.future.await
 import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 import java.io.IOException
@@ -19,6 +23,7 @@ class ScriptExecutionRepositoryImpl(
     override fun run(
         command: String,
         arguments: List<String>,
+        stopSignal: CompletableDeferred<Unit>
     ) = callbackFlow {
         val process: Process = try {
             ProcessBuilder(command, *arguments.toTypedArray()).redirectErrorStream(false).start()
@@ -30,10 +35,11 @@ class ScriptExecutionRepositoryImpl(
 
         val outJob = launch { processStdOut(process) }
         val errJob = launch { processStdErr(process) }
+        launch { try { stopSignal.await() } finally { process.destroy() } }
 
-        val exitCodeJob = launch {
+        launch {
             try {
-                val exitCode = process.waitFor()
+                val exitCode = process.onExit().await().exitValue()
                 listOf(outJob, errJob).joinAll()
                 send(ExecutionEvent.Finished(exitCode))
             } finally {
@@ -43,7 +49,7 @@ class ScriptExecutionRepositoryImpl(
 
         awaitClose {
             if (process.isAlive) process.destroy()
-            listOf(exitCodeJob, outJob, errJob).forEach { it.cancel() }
+            coroutineContext.cancelChildren()
         }
     }.flowOn(ioDispatcher)
         .onEach { println("ScriptExecution: $it") } // TODO: replace with Logging

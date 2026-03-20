@@ -1,44 +1,54 @@
 package com.example.scripteditor.domain
 
+import com.example.scripteditor.core.flow.ValueOrPlug
+import com.example.scripteditor.core.flow.dropPlugs
+import com.example.scripteditor.core.flow.shareInSequential
 import com.example.scripteditor.core.models.ExecutionEvent
 import com.example.scripteditor.core.models.ExecutionState
-import com.example.scripteditor.data.ScriptExecutionSequentialRepository
-import com.example.scripteditor.data.ScriptExecutionStoppableRepository
+import com.example.scripteditor.data.ScriptExecutionRepository
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
 
 class ScriptStateHolderImpl1(
-    private val scriptExecutionRepository: ScriptExecutionStoppableRepository = ScriptExecutionSequentialRepository(),
+    private val scriptExecutionRepository: ScriptExecutionRepository,
     private val scope: CoroutineScope,
-    exceptionHandler: (e: Throwable) -> Unit = { e -> if(e is CancellationException) throw e }
+    exceptionHandler: (e: Throwable) -> Unit = { e -> throw e }
 ) : ScriptStateHolder {
 
     private val scriptExecutionRequestChannel: Channel<ExecutionRequest> = Channel()
 
+    private val scriptExecutionState: MutableSharedFlow<ScriptExecutionState> = MutableSharedFlow()
+
     @OptIn(ExperimentalCoroutinesApi::class)
-    private val scriptExecutionStateFlow: SharedFlow<ScriptExecutionState> =
-        scriptExecutionRequestChannel.consumeAsFlow().distinctUntilChanged()
+    private val scriptExecutionStateFlow: SharedFlow<ValueOrPlug<ScriptExecutionState>> =
+        scriptExecutionRequestChannel.receiveAsFlow()
             .transformLatest { request ->
                 when(request) {
                     is ExecutionRequest.RunScript -> {
                         emit(ScriptExecutionState.RunningScript(request.command, request.args))
-                        // In order to work emit should wait for all subscribers to process a value.
-                        // In current implementation of sharedFlow this works not this way.
-                        // I see that emit is implemented more like send (to Channel),
-                        // which awakes as soon as all subscribers got a value (but not processed it)
                         emit(ScriptExecutionState.StoppedScript)
                     }
                     ExecutionRequest.StopScript -> {
+                        println("Emitting StoppingScript")
                         emit(ScriptExecutionState.StoppingScript)
+                        println("StoppingScript Emitted ")
                         emit(ScriptExecutionState.StoppedScript)
                     }
                 }
             }
-            .shareIn(scope, SharingStarted.Eagerly, replay = 0)
+            .buffer(0)
+            .shareInSequential(scope)
+
+    /*
+    ------+------
+          |
+          +------
+     */
 
 
     override val scriptOutput: SharedFlow<ExecutionEvent> = scriptExecutionStateFlow
+        .dropPlugs()
         .filterIsInstance<ScriptExecutionState.RunningScript>()
         .transform { emitAll(scriptExecutionRepository.run(it.command, it.args, it.stopSignal)) }
         .catch { exceptionHandler(it) }
@@ -46,6 +56,7 @@ class ScriptStateHolderImpl1(
 
 
     override val executionState: StateFlow<ExecutionState> = scriptExecutionStateFlow
+        .dropPlugs()
         .completeRunningScriptOnStopRequest()
         .map(ScriptExecutionState::toExecutionState)
         .stateIn(scope, SharingStarted.Eagerly, ExecutionState.STOPPED)
@@ -63,19 +74,18 @@ class ScriptStateHolderImpl1(
             scriptExecutionRequestChannel.send(ExecutionRequest.StopScript)
         }
     }
-
-    private fun SharedFlow<ScriptExecutionState>.completeRunningScriptOnStopRequest() = this
-        .pairScan(null to ScriptExecutionState.StoppedScript)
-        .transform { (prev, cur) ->
-            if (prev is ScriptExecutionState.RunningScript && cur is ScriptExecutionState.StoppingScript) {
-                prev.stopSignal.complete(Unit)
-            }
-            emit(cur)
-        }
-
 }
 
-private sealed class ScriptExecutionState {
+fun Flow<ScriptExecutionState>.completeRunningScriptOnStopRequest() = this
+    .pairScan(null to ScriptExecutionState.StoppedScript)
+    .transform { (prev, cur) ->
+        if (prev is ScriptExecutionState.RunningScript && cur is ScriptExecutionState.StoppingScript) {
+            prev.stopSignal.complete(Unit)
+        }
+        emit(cur)
+    }
+
+sealed class ScriptExecutionState {
     object StoppedScript: ScriptExecutionState()
     class RunningScript(
         val command: String,
@@ -86,12 +96,12 @@ private sealed class ScriptExecutionState {
 
     fun toExecutionState() = when(this) {
         is RunningScript -> ExecutionState.RUNNING
-        StoppedScript -> ExecutionState.STOPPING
-        StoppingScript -> ExecutionState.STOPPED
+        StoppingScript -> ExecutionState.STOPPING
+        StoppedScript -> ExecutionState.STOPPED
     }
 }
 
-private sealed class ExecutionRequest {
+sealed class ExecutionRequest {
     data class RunScript(val command: String, val args: List<String>) : ExecutionRequest()
     object StopScript : ExecutionRequest()
 }
